@@ -417,13 +417,10 @@ def generate_form_pdf(
     c.setLineWidth(0.5)
     c.line(MARGIN, footer_y + 4 * mm, PAGE_W - MARGIN, footer_y + 4 * mm)
 
-    c.setFont(FONT_NAME, 5)
-    c.setFillColor(MID)
-    c.drawString(MARGIN, footer_y,
-                 f"{num_questions} Soru  \u00b7  {len(options)} \u015e\u0131k  \u00b7  "
-                 "Ka\u011f\u0131d\u0131 katlamay\u0131n\u0131z ve kirletmeyiniz.")
-    c.drawRightString(PAGE_W - MARGIN, footer_y,
-                      "Made by Sena K\u00f6se")
+    c.setFont(FONT_NAME, 6)
+    c.setFillColor(ACCENT_DARK)
+    c.drawCentredString(PAGE_W / 2, footer_y,
+                        "Made by Sena K\u00f6se \u2665")
     c.setFillColor(black)
 
     c.save()
