@@ -1,56 +1,57 @@
-# 📄 OMR Scanner — Optical Mark Recognition System
+# OMR Scanner — Optik Form Okuyucu + El Yazisi Tanima Sistemi
 
-A **ZipGrade-style** answer sheet scanner that reads filled bubble sheets using your phone camera. Built with **React + FastAPI + OpenCV**.
+Sinav kagitlarini telefon kamerasiyla tarayan, optik formu okuyan, el yazisi karakter kutularindan ogrenci bilgilerini cikaran ve sinif listesiyle eslestirerek otomatik notlandiran web tabanli sistem.
 
-<p align="center">
-  <img src="docs/demo.gif" width="300" alt="Demo" />
-</p>
+**React + FastAPI + OpenCV + OCR**
 
 ---
 
-## ✨ Features
+## Ozellikler
 
-- **📋 Form Generator** — Creates printable A4 optical answer sheets (PDF) with ArUco alignment markers
-- **📷 Camera Scanner** — Scan answer sheets using your phone camera (or upload photos)
-- **🤖 OMR Engine** — OpenCV-powered bubble detection with adaptive thresholding
-- **📊 Auto Grading** — Instant scoring against your answer key
-- **📈 Statistics** — Class averages, score distribution, per-question analysis
-- **📥 CSV Export** — Download all results for further analysis
-- **🔧 Configurable** — 20 to 100 questions, A-B-C-D-E options
+- **Optik Form Olusturucu** — A4 PDF formatinda yazdirilabilir sinav formu (ArUco hizalama isaretleri, QR kod, karakter kutulari, balon cevap alanlari)
+- **Kamera ile Tarama** — Telefon kamerasini kullanarak optik form okuma (veya fotograf yukleme)
+- **OMR Motoru** — OpenCV tabanli balon algilama, adaptif esikleme
+- **OCR Motoru** — Karakter kutularindan el yazisi tanima (ad, soyad, ogrenci no)
+- **QR Kod Okuma** — Formdan sinav bilgilerini otomatik okuma
+- **Sinif Listesi** — Manuel, toplu yapistirma veya PDF yukleme ile ogrenci listesi olusturma
+- **Otomatik Eslestirme** — Taranan kagitlari ogrenci numarasi/isim ile sinif listesine eslestirme
+- **Manuel Dogrulama** — Dusuk guvenli OCR sonuclarini ogretmenin duzenleyebildigi dogrulama ekrani
+- **Otomatik Notlandirma** — Cevap anahtarina gore aninda puanlama
+- **Istatistikler** — Sinif ortalamasi, puan dagilimi, soru bazli analiz
+- **CSV Disari Aktarma** — Tum sonuclari indirme
 
-## 🏗️ Architecture
+## Mimari
 
 ```
-┌─────────────────┐     ┌──────────────────────┐
-│   React + Vite  │────▶│   FastAPI Backend     │
-│   (Frontend)    │     │                       │
-│                 │     │  ┌──────────────────┐ │
-│  • Camera       │     │  │  OMR Engine      │ │
-│  • Answer Key   │ API │  │  (OpenCV)        │ │
-│  • Results      │◀────│  │  • ArUco detect  │ │
-│  • Stats        │     │  │  • Perspective   │ │
-│                 │     │  │  • Bubble read   │ │
-└─────────────────┘     │  └──────────────────┘ │
-                        │  ┌──────────────────┐ │
-                        │  │  Form Generator  │ │
-                        │  │  (ReportLab)     │ │
-                        │  └──────────────────┘ │
-                        └──────────────────────┘
+┌─────────────────────┐      ┌──────────────────────────────┐
+│   React + Vite      │      │   FastAPI Backend             │
+│   (Frontend)        │      │                               │
+│                     │      │  ┌────────────────────────┐  │
+│  • Ayarlar          │      │  │  OMR Engine (OpenCV)   │  │
+│  • Sinif Listesi    │ API  │  │  • ArUco algilama      │  │
+│  • Tarama           │◄────►│  │  • Perspektif duzeltme │  │
+│  • Dogrulama        │      │  │  • Balon okuma         │  │
+│  • Sonuclar         │      │  └────────────────────────┘  │
+│                     │      │  ┌────────────────────────┐  │
+│  Vercel             │      │  │  OCR Engine            │  │
+│                     │      │  │  • Karakter tanima      │  │
+└─────────────────────┘      │  │  • Sablon eslestirme   │  │
+                             │  └────────────────────────┘  │
+                             │  ┌────────────────────────┐  │
+                             │  │  Form Generator        │  │
+                             │  │  (ReportLab + QR)      │  │
+                             │  └────────────────────────┘  │
+                             │  ┌────────────────────────┐  │
+                             │  │  QR Reader (pyzbar)    │  │
+                             │  └────────────────────────┘  │
+                             │                               │
+                             │  Render (Docker)              │
+                             └──────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## Hizli Baslangic
 
-### Option 1: Docker Compose (Recommended)
-
-```bash
-git clone https://github.com/YOUR_USERNAME/omr-scanner.git
-cd omr-scanner
-docker-compose up --build
-```
-
-Open **http://localhost:3000** on your phone or computer.
-
-### Option 2: Manual Setup
+### Yerel Kurulum
 
 **Backend:**
 
@@ -70,151 +71,189 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+Tarayicida **http://localhost:5173** adresini acin.
 
-> **Note:** For manual setup, update `vite.config.js` proxy target from `http://backend:8000` to `http://localhost:8000`.
+### Docker
 
-## 📖 How to Use
-
-### Step 1: Print the Form
-
-1. Go to **Setup** tab
-2. Select question count (20/40/60/80/100)
-3. Click **"Download printable form"** to get the PDF
-4. Print on A4 paper
-
-### Step 2: Set Answer Key
-
-1. In Setup tab, click each question's correct answer (A-B-C-D-E)
-2. Click **"Start scanning"**
-
-### Step 3: Scan Sheets
-
-1. Go to **Scan** tab
-2. Point your camera at a filled answer sheet
-3. Align the 4 corner markers within the guide frame
-4. Tap the capture button
-5. Results appear instantly!
-
-### Step 4: View Results
-
-- **Results** tab shows all scanned sheets with scores
-- Export to CSV for Excel/Google Sheets
-
-## 📄 Answer Sheet Layout
-
-The generated form includes:
-
-```
-┌──────────────────────────────────┐
-│ [ArUco 0]          [ArUco 1]    │  ← Corner markers
-│                                  │
-│        SINAV OPTIK FORMU         │
-│  Name: ___________  Class: ___   │
-│                                  │
-│  STUDENT NO                      │
-│  ①②③④⑤⑥⑦⑧⑨⑩                    │  ← 10-digit bubble grid
-│  ⓪⓪⓪⓪⓪⓪⓪⓪⓪⓪                    │
-│  ...                             │
-│                                  │
-│  ANSWERS                         │
-│  1. ⓐⓑⓒⓓⓔ  11. ⓐⓑⓒⓓⓔ         │  ← Answer bubbles
-│  2. ⓐⓑⓒⓓⓔ  12. ⓐⓑⓒⓓⓔ         │
-│  ...                             │
-│                                  │
-│ [ArUco 2]          [ArUco 3]    │  ← Corner markers
-└──────────────────────────────────┘
+```bash
+cd backend
+docker build -t omr-backend .
+docker run -p 8000:8000 omr-backend
 ```
 
-## 🔬 How OMR Works
+## Kullanim
 
-1. **ArUco Detection** — 4 corner markers are detected using OpenCV's ArUco module
-2. **Perspective Transform** — Image is warped to a flat, top-down view regardless of camera angle
-3. **Adaptive Thresholding** — Handles different lighting conditions (fluorescent, daylight, shadows)
-4. **Bubble Analysis** — Each bubble region is masked with a circle and fill ratio is calculated
-5. **Decision Logic**:
-   - Fill ratio > 35% → marked
-   - If multiple bubbles filled → picks highest or flags as ambiguous
-   - Confidence score indicates detection reliability
+### 1. Sinav Olusturma
 
-## 🛠️ Tech Stack
+1. **Ayarlar** sekmesine gidin
+2. Soru sayisini secin (20 / 40 / 60 / 80)
+3. Secenek sayisini belirleyin (A-B-C-D veya A-B-C-D-E)
+4. Ders kodunu girin (istege bagli)
+5. Cevap anahtarini isaretleyin
+6. **"Yazdirilabilir form indir"** ile PDF'i indirin ve A4 kagida yazdirin
 
-| Component | Technology |
-|-----------|-----------|
+### 2. Sinif Listesi (Istege Bagli)
+
+1. **Sinif Listesi** sekmesine gidin
+2. Ogrenci eklemek icin uc yontem:
+   - **Tek tek ekleme** — Ad, Soyad, No alanlarina yazin
+   - **Toplu yapistirma** — Excel'den kopyala-yapistir (Ad, Soyad, No formatinda)
+   - **PDF yukleme** — Sinif listesi PDF dosyasi yukleyin, otomatik ayiklanir
+3. **"Kaydet ve taramaya gec"** butonuna basin
+
+### 3. Tarama
+
+1. **Tara** sekmesine gidin
+2. Telefon kamerasini acin veya fotograf yukleyin
+3. Doldurulan formu cerceve icine hizalayin
+4. Yakalama butonuna basin
+5. Sonuc aninda gorunur: puan, cevaplar, ogrenci bilgileri
+
+### 4. Dogrulama
+
+1. **Dogrula** sekmesinde dusuk guvenli OCR sonuclari listelenir
+2. Form goruntusunu inceleyip ad/soyad/numara duzeltebilirsiniz
+3. Onaylayin
+
+### 5. Sonuclar
+
+1. **Sonuclar** sekmesinde tum taranan kagitlar ve puanlar gorulur
+2. Sinif listesi yuklediyseniz, eslestirilen ogrencilerin notlari gorulur
+3. CSV olarak disari aktarabilirsiniz
+
+## Optik Form Yapisi
+
+```
+┌──────────────────────────────────────────┐
+│ [ArUco 0]                    [ArUco 1]   │
+│                                          │
+│          SINAV OPTIK FORMU               │
+│          Ders: MAT101                    │
+│                                          │
+│  AD      [_][_][_][_][_]...[_]  (20 ktu) │
+│  SOYAD   [_][_][_][_][_]...[_]  (20 ktu) │
+│  NO      [_][_][_][_][_][_][_][_][_]     │
+│                                 (9 ktu)  │
+│                                          │
+│  [QR KOD]                                │
+│  (sinav ID, ders, soru sayisi)           │
+│                                          │
+│  CEVAPLAR                                │
+│   1. (A)(B)(C)(D)(E)  21. (A)(B)(C)(D)(E)│
+│   2. (A)(B)(C)(D)(E)  22. (A)(B)(C)(D)(E)│
+│   ...         5'li gruplar halinde       │
+│                                          │
+│ [ArUco 2]                    [ArUco 3]   │
+└──────────────────────────────────────────┘
+```
+
+## OMR Nasil Calisir
+
+1. **ArUco Algilama** — 4 kose isareti OpenCV ArUco modulu ile bulunur
+2. **Perspektif Duzeltme** — Goruntu duz hale getirilir (aci, egiklik duzeltmesi)
+3. **Adaptif Esikleme** — Farkli isik kosullarinda calismak icin
+4. **Balon Analizi** — Her balon bolgesinin dolulik orani hesaplanir
+5. **Karar Mantigi** — Dolulik > %35 ise isaretli; birden fazla isaretlenmisse en yuksek secilir veya belirsiz olarak isaretlenir
+6. **OCR** — Karakter kutulasindan sablon eslestirme + kontur analizi ile harf/rakam tanima
+7. **QR Okuma** — pyzbar ile formdan sinav bilgileri cikartilir
+
+## Teknoloji
+
+| Bilesen | Teknoloji |
+|---------|-----------|
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | Python 3.11, FastAPI |
-| OMR Engine | OpenCV 4.10 (ArUco + adaptive threshold) |
-| PDF Generation | ReportLab |
-| Camera | react-webcam |
-| Containerization | Docker, Docker Compose |
+| OMR Motoru | OpenCV 4.10 (ArUco + adaptif esikleme) |
+| OCR Motoru | OpenCV sablon eslestirme + kontur analizi |
+| QR Kod | qrcode (olusturma), pyzbar (okuma) |
+| PDF Olusturma | ReportLab (DejaVuSans font — Turkce destek) |
+| PDF Ayiklama | pdfplumber (sinif listesi PDF okuma) |
+| Kamera | react-webcam |
+| Deploy | Render (backend Docker), Vercel (frontend) |
 
-## 📁 Project Structure
+## Proje Yapisi
 
 ```
 omr-scanner/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py            # FastAPI routes
-│   │   ├── omr_engine.py      # OpenCV OMR processing
-│   │   ├── form_generator.py  # PDF form creation
-│   │   └── models.py          # Pydantic schemas
+│   │   ├── main.py             # FastAPI endpoint'leri
+│   │   ├── omr_engine.py       # OpenCV OMR isleme
+│   │   ├── ocr_engine.py       # Karakter tanima motoru
+│   │   ├── qr_reader.py        # QR kod okuyucu
+│   │   ├── form_generator.py   # PDF form olusturucu
+│   │   └── models.py           # Pydantic semalari
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx            # Main React app
-│   │   ├── main.jsx           # Entry point
-│   │   └── index.css          # Tailwind styles
-│   ├── nginx.conf
-│   ├── Dockerfile
-│   └── package.json
-├── docker-compose.yml
+│   │   ├── App.jsx             # Ana React uygulama
+│   │   ├── main.jsx            # Giris noktasi
+│   │   └── index.css           # Tailwind stilleri
+│   ├── package.json
+│   └── vercel.json
 └── README.md
 ```
 
-## 🎯 API Endpoints
+## API Endpoint'leri
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/forms/download/{n}` | Download blank form PDF |
-| `POST` | `/api/forms/generate` | Generate custom form |
-| `POST` | `/api/sessions/create` | Create exam session with answer key |
-| `GET` | `/api/sessions/{id}` | Get session details |
-| `POST` | `/api/scan` | Scan from uploaded image |
-| `POST` | `/api/scan/base64` | Scan from base64 (camera) |
-| `GET` | `/api/sessions/{id}/stats` | Get exam statistics |
-| `GET` | `/api/sessions/{id}/export` | Export results as CSV |
+| Metod | Endpoint | Aciklama |
+|-------|----------|----------|
+| `POST` | `/api/sessions/create` | Sinav oturumu olustur (cevap anahtari ile) |
+| `GET` | `/api/sessions/{id}` | Oturum detaylarini getir |
+| `GET` | `/api/forms/download/{n}` | Bos form PDF indir |
+| `POST` | `/api/forms/generate` | Ozel form olustur |
+| `POST` | `/api/scan` | Yuklenen goruntuden tara |
+| `POST` | `/api/scan/base64` | Base64 goruntuden tara (kamera) |
+| `POST` | `/api/sessions/{id}/roster` | Sinif listesi yukle (JSON) |
+| `POST` | `/api/sessions/{id}/roster/pdf` | Sinif listesi yukle (PDF) |
+| `GET` | `/api/sessions/{id}/roster` | Sinif listesini getir |
+| `GET` | `/api/sessions/{id}/review` | Dogrulama bekleyen taramalar |
+| `POST` | `/api/sessions/{id}/verify` | OCR sonucunu duzenle/onayla |
+| `GET` | `/api/sessions/{id}/stats` | Sinav istatistikleri |
+| `GET` | `/api/sessions/{id}/export` | Sonuclari CSV olarak indir |
 
-## ⚙️ Configuration
+## Yapilandirma
 
-Key parameters in `omr_engine.py`:
+`omr_engine.py` temel parametreleri:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `fill_threshold` | 0.35 | Min fill ratio to consider bubble marked |
-| `ambiguity_threshold` | 0.15 | Min difference between top-2 bubbles |
-| `ARUCO_DICT_TYPE` | `DICT_4X4_50` | ArUco dictionary type |
+| Parametre | Varsayilan | Aciklama |
+|-----------|-----------|----------|
+| `fill_threshold` | 0.35 | Balonun isaretli sayilmasi icin minimum dolulik orani |
+| `ambiguity_threshold` | 0.15 | En yuksek iki balon arasindaki minimum fark |
+| `ARUCO_DICT_TYPE` | `DICT_4X4_50` | ArUco sozluk tipi |
 
-## 🔧 Troubleshooting
+`ocr_engine.py` temel parametreleri:
 
-**"Could not find all 4 markers"**
-- Ensure all 4 corner markers are visible in the photo
-- Avoid shadows on the markers
-- Hold the camera steady, ~30cm above the sheet
+| Parametre | Varsayilan | Aciklama |
+|-----------|-----------|----------|
+| `empty_threshold` | 0.03 | Kutunun bos sayilmasi icin esik |
+| `REVIEW_THRESHOLD` | 0.6 | Bu guvenden dusuk sonuclar dogrulama gerektirir |
 
-**Low accuracy**
-- Use a dark pen/pencil to fill bubbles completely
-- Ensure good, even lighting
-- Avoid crumpled or folded papers
+## Sorun Giderme
 
-**Camera not working**
-- Allow camera permissions in your browser
-- Use HTTPS or localhost (camera requires secure context)
+**"4 isaret bulunamadi"**
+- 4 kose isaretinin tamaminin goruntuye girdiginden emin olun
+- Isaretler uzerinde golge olmasin
+- Kamerayi yaklasik 30cm yukseklikten sabit tutun
 
-## 📝 License
+**Dusuk dogruluk**
+- Koyu kalem/tukenmez ile balonlari tamamen doldurun
+- Iyi ve duz aydinlatma saglayin
+- Burusuk veya katlanmis kagit kullanmayin
 
-MIT License — Free for educational and commercial use.
+**Kamera calismiyor**
+- Tarayicida kamera iznini verin
+- HTTPS veya localhost kullanin (kamera guvenli baglam gerektirir)
+
+**Turkce karakterler formda gorunmuyor**
+- Backend'de `fonts-dejavu-core` paketinin yuklu oldugunu kontrol edin
+- Docker kullaniyorsaniz Dockerfile'da zaten mevcut
+
+## Lisans
+
+MIT Lisansi
 
 ---
 
-Built with ❤️ for educators who deserve better tools.
+Ogretmenler icin gelistirilmistir.
