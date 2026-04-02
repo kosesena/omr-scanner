@@ -11,8 +11,16 @@ import cv2
 import uuid
 import json
 import os
+import re
 import base64
 from typing import Optional
+from io import BytesIO
+
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
 
 from app.models import (
     AnswerKeyRequest, FormGenerateRequest, ScanResponse,
@@ -173,6 +181,167 @@ def get_roster(session_id: str):
     if session_id not in sessions:
         raise HTTPException(404, "Session not found")
     return sessions[session_id].roster
+
+
+@app.post("/api/sessions/{session_id}/roster/pdf")
+async def upload_roster_pdf(session_id: str, file: UploadFile = File(...)):
+    """Parse a PDF class roster and extract student list."""
+    if session_id not in sessions:
+        raise HTTPException(404, "Session not found")
+
+    if not HAS_PDFPLUMBER:
+        raise HTTPException(500, "PDF parsing not available")
+
+    contents = await file.read()
+    students = _parse_roster_pdf(contents)
+
+    if not students:
+        raise HTTPException(400, "PDF'den ogrenci bilgisi cikarilamamistir. "
+                            "PDF'de tablo veya 'ad soyad numara' formati olmalidir.")
+
+    session = sessions[session_id]
+    # Append to existing roster (don't replace)
+    existing = session.roster.students if session.roster else []
+    existing_numbers = {s.student_number for s in existing}
+
+    added = 0
+    for s in students:
+        if s.student_number and s.student_number in existing_numbers:
+            continue  # skip duplicates
+        existing.append(s)
+        existing_numbers.add(s.student_number)
+        added += 1
+
+    session.roster = ClassRoster(students=existing)
+
+    return {
+        "message": f"{added} yeni ogrenci eklendi (toplam {len(existing)})",
+        "added": added,
+        "total": len(existing),
+        "students": [
+            {"name": s.name, "surname": s.surname, "student_number": s.student_number}
+            for s in students
+        ],
+    }
+
+
+def _parse_roster_pdf(pdf_bytes: bytes) -> list:
+    """Extract student list from PDF. Tries table extraction first, then text."""
+    students = []
+
+    try:
+        pdf_io = BytesIO(pdf_bytes)
+        with pdfplumber.open(pdf_io) as pdf:
+            # Try table extraction first
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    for row in table:
+                        if not row or all(cell is None for cell in row):
+                            continue
+                        student = _parse_table_row(row)
+                        if student:
+                            students.append(student)
+
+            # If no tables found, try text-based parsing
+            if not students:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        for line in text.split("\n"):
+                            student = _parse_text_line(line)
+                            if student:
+                                students.append(student)
+    except Exception as e:
+        raise HTTPException(400, f"PDF okuma hatasi: {str(e)}")
+
+    return students
+
+
+def _parse_table_row(row: list) -> Student | None:
+    """Try to extract student data from a table row."""
+    cells = [str(c).strip() if c else "" for c in row]
+    cells = [c for c in cells if c]
+
+    if len(cells) < 2:
+        return None
+
+    # Skip header rows
+    header_words = {"ad", "soyad", "name", "surname", "no", "numara",
+                    "ogrenci", "sira", "#", "student", "number"}
+    if any(w in cells[0].lower() for w in header_words):
+        return None
+
+    # Find student number (9-digit number pattern)
+    student_no = ""
+    name = ""
+    surname = ""
+
+    for cell in cells:
+        # Check if cell looks like a student number
+        digits = re.sub(r'\D', '', cell)
+        if len(digits) >= 6 and not student_no:
+            student_no = digits
+            continue
+
+        # Skip pure numbers (like row index)
+        if cell.isdigit() and len(cell) <= 3:
+            continue
+
+        # Remaining text cells are name/surname
+        if not name:
+            name = cell.upper()
+        elif not surname:
+            surname = cell.upper()
+
+    if not name and not student_no:
+        return None
+
+    # If name contains space and no surname, split it
+    if name and not surname and " " in name:
+        parts = name.split(None, 1)
+        name = parts[0]
+        surname = parts[1] if len(parts) > 1 else ""
+
+    return Student(name=name, surname=surname, student_number=student_no)
+
+
+def _parse_text_line(line: str) -> Student | None:
+    """Try to extract student data from a text line."""
+    line = line.strip()
+    if len(line) < 3:
+        return None
+
+    # Skip headers
+    lower = line.lower()
+    if any(w in lower for w in ["ad", "soyad", "numara", "ogrenci", "sinif", "ders", "---"]):
+        return None
+
+    # Find numbers in line
+    numbers = re.findall(r'\d{6,}', line)
+    student_no = numbers[0] if numbers else ""
+
+    # Remove the student number from line to get name parts
+    text = re.sub(r'\d{3,}', '', line).strip()
+    text = re.sub(r'[,;|\t]+', ' ', text).strip()
+
+    # Remove leading index number (1. or 1)
+    text = re.sub(r'^\d{1,3}[.\-)\s]+', '', text).strip()
+
+    if not text:
+        return None
+
+    parts = text.split()
+    if len(parts) == 0:
+        return None
+
+    name = parts[0].upper()
+    surname = " ".join(parts[1:]).upper() if len(parts) > 1 else ""
+
+    if not name:
+        return None
+
+    return Student(name=name, surname=surname, student_number=student_no)
 
 
 def _match_student_to_roster(session: ExamSession, scan_result: ScanResponse,

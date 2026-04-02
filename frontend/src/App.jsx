@@ -235,6 +235,8 @@ function RosterPage({ session, setPage }) {
   const [uploading, setUploading] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [showBulk, setShowBulk] = useState(false);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const pdfInputRef = useRef(null);
 
   const addStudent = () => {
     if (!name.trim() || !surname.trim() || !studentNo.trim()) {
@@ -273,6 +275,36 @@ function RosterPage({ session, setPage }) {
     setStudents([...students, ...parsed]);
     setBulkText("");
     setShowBulk(false);
+  };
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!session) {
+      alert("Önce sınav oluşturun");
+      return;
+    }
+    setPdfUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await axios.post(
+        `${API}/api/sessions/${session.session_id}/roster/pdf`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const parsed = res.data.students || [];
+      if (parsed.length === 0) {
+        alert("PDF'den öğrenci bilgisi çıkarılamadı. Formatı kontrol edin.");
+      } else {
+        setStudents((prev) => [...prev, ...parsed]);
+        alert(`${parsed.length} öğrenci PDF'den eklendi`);
+      }
+    } catch (e) {
+      alert("PDF yükleme hatası: " + (e.response?.data?.detail || e.message));
+    }
+    setPdfUploading(false);
+    if (pdfInputRef.current) pdfInputRef.current.value = "";
   };
 
   const removeStudent = (idx) => {
@@ -349,13 +381,30 @@ function RosterPage({ session, setPage }) {
           </button>
         </div>
 
-        {/* Bulk add toggle */}
-        <button
-          onClick={() => setShowBulk(!showBulk)}
-          className="text-xs text-blue-500 hover:underline mb-3"
-        >
-          {showBulk ? "Kapat" : "Toplu ekle (yapıştır)"}
-        </button>
+        {/* PDF upload + Bulk add */}
+        <div className="flex gap-3 mb-3 items-center flex-wrap">
+          <button
+            onClick={() => pdfInputRef.current?.click()}
+            disabled={pdfUploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            {pdfUploading ? "PDF okunuyor..." : "PDF'den yukle"}
+          </button>
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={handlePdfUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => setShowBulk(!showBulk)}
+            className="text-xs text-blue-500 hover:underline"
+          >
+            {showBulk ? "Kapat" : "Toplu ekle (yapistir)"}
+          </button>
+        </div>
 
         {showBulk && (
           <div className="mb-3">
