@@ -39,7 +39,7 @@ CHAR_BOX_CONFIG = {
         "top": 0.128,
         "left": 0.065,
         "label_width_ratio": 0.04,
-        "num_boxes": 10,
+        "num_boxes": 9,
         "box_width": 0.031,
         "box_height": 0.025,
         "type": "numeric",

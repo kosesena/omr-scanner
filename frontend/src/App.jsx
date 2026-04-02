@@ -134,7 +134,7 @@ function SetupPage({ session, setSession, setPage }) {
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <label className="text-sm text-slate-600 dark:text-slate-400">Soru sayısı:</label>
           <div className="flex gap-2">
-            {[20, 40, 60, 80, 100].map((n) => (
+            {[20, 40, 60, 80].map((n) => (
               <button
                 key={n}
                 onClick={() => { setNumQ(n); setKeys({}); }}

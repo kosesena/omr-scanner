@@ -90,8 +90,8 @@ def generate_form(req: FormGenerateRequest):
 @app.get("/api/forms/download/{num_questions}")
 def download_default_form(num_questions: int = 40):
     """Download a default form."""
-    if num_questions not in [20, 40, 60, 80, 100]:
-        raise HTTPException(400, "Supported: 20, 40, 60, 80, 100 questions")
+    if num_questions not in [20, 40, 60, 80]:
+        raise HTTPException(400, "Supported: 20, 40, 60, 80 questions")
 
     filepath = os.path.join(FORMS_DIR, f"default_v2_{num_questions}q.pdf")
     if not os.path.exists(filepath):
