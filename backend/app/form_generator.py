@@ -416,7 +416,7 @@ def generate_form_pdf(
     c.setFont(FONT_NAME_BOLD, 6.5)
     c.setFillColor(ACCENT_DARK)
     c.drawString(bk_x, no_row_y + box_size * 0.25, "K\u0130TAP\u00c7IK:")
-    bk_label_w = c.stringWidth("K\u0130TAP\u00c7IK:", FONT_NAME_BOLD, 6.5) + 5 * mm
+    bk_label_w = c.stringWidth("K\u0130TAP\u00c7IK:", FONT_NAME_BOLD, 6.5) + 9 * mm
     for i, bk in enumerate(["A", "B"]):
         bx = bk_x + bk_label_w + i * 8 * mm
         c.setStrokeColor(BUBBLE_BORDER)
