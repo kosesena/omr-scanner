@@ -169,7 +169,7 @@ function SetupPage({ session, setSession, setPage }) {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap mb-3">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Sik sayisi:</label>
+          <label className="text-sm text-slate-600 dark:text-slate-400">Şık sayısı:</label>
           <div className="flex gap-2">
             {[4, 5].map((n) => (
               <button
@@ -426,7 +426,7 @@ function RosterPage({ session, setPage }) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             <Upload className="w-3.5 h-3.5" />
-            {pdfUploading ? "PDF okunuyor..." : "PDF'den yukle"}
+            {pdfUploading ? "PDF okunuyor..." : "PDF'den yükle"}
           </button>
           <input
             ref={pdfInputRef}
@@ -439,7 +439,7 @@ function RosterPage({ session, setPage }) {
             onClick={() => setShowBulk(!showBulk)}
             className="text-xs text-blue-500 hover:underline"
           >
-            {showBulk ? "Kapat" : "Toplu ekle (yapistir)"}
+            {showBulk ? "Kapat" : "Toplu ekle (yapıştır)"}
           </button>
         </div>
 
