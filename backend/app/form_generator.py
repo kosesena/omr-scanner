@@ -249,13 +249,7 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     header_fs = min(8.5, max(7, sp_y / mm * 0.75))
     q_fs = min(8.5, max(7, sp_y / mm * 0.7))
 
-    # Header line FIRST (so letters draw on top)
-    c.setStrokeColor(ACCENT)
-    c.setLineWidth(0.8)
-    c.line(x_start, y_start, x_start + available_width, y_start)
-    c.setStrokeColor(black)
-
-    # Column headers ON TOP of line
+    # Column headers
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
         c.setFont(FONT_NAME_BOLD, header_fs)
