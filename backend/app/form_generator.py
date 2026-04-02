@@ -238,7 +238,7 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     # Solve for sp_y with group_gap = sp_y * 0.55
     total_slots = questions_per_col + num_groups * 0.55
     sp_y = available_height / max(total_slots, 1)
-    sp_y = min(sp_y, 16 * mm)  # cap max (allows 20q to spread)
+    sp_y = min(sp_y, 20 * mm)  # cap max (allows 20q to spread fully)
     sp_y = max(sp_y, 5.5 * mm)  # cap min
     group_gap = sp_y * 0.55
 
@@ -249,27 +249,26 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     header_fs = min(8.5, max(7, sp_y / mm * 0.75))
     q_fs = min(8.5, max(7, sp_y / mm * 0.7))
 
-    # Column headers with accent underline
+    # Header line FIRST (so letters draw on top)
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(0.8)
+    c.line(x_start, y_start, x_start + available_width, y_start)
+    c.setStrokeColor(black)
+
+    # Column headers ON TOP of line
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
         c.setFont(FONT_NAME_BOLD, header_fs)
         c.setFillColor(ACCENT_DARK)
         for opt_idx, opt in enumerate(options):
             ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
-            c.drawCentredString(ox, y_start + 2.5 * mm, opt)
+            c.drawCentredString(ox, y_start + 3 * mm, opt)
     c.setFillColor(black)
-
-    # Header line
-    c.setStrokeColor(ACCENT)
-    c.setLineWidth(0.8)
-    c.line(x_start, y_start - 0.5 * mm,
-           x_start + available_width, y_start - 0.5 * mm)
-    c.setStrokeColor(black)
 
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
         q_start_num = col_idx * questions_per_col
-        row_y = y_start - 4.5 * mm
+        row_y = y_start - 3 * mm
 
         for row in range(questions_per_col):
             q_num = q_start_num + row + 1
