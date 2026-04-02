@@ -169,17 +169,17 @@ function SetupPage({ session, setSession, setPage }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           {Array.from({ length: numQ }, (_, i) => i + 1).map((q) => (
-            <div key={q} className="flex items-center gap-1">
-              <span className="text-xs text-slate-500 w-6 text-right">{q}.</span>
-              <div className="flex gap-0.5">
+            <div key={q} className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50">
+              <span className="text-xs font-medium text-slate-500 w-7 text-right shrink-0">{q}.</span>
+              <div className="flex gap-1">
                 {options.map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setAnswer(q, opt)}
                     className={cn(
-                      "w-7 h-7 rounded-full text-xs font-bold transition-all",
+                      "w-8 h-8 rounded-full text-xs font-bold transition-all",
                       keys[String(q)] === opt
                         ? "bg-blue-500 text-white scale-110 shadow"
                         : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200"
