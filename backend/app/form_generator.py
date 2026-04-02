@@ -57,22 +57,34 @@ def _register_fonts():
     if _FONT_REGISTERED:
         return
 
-    search_paths = [
+    # Search paths: Linux (Docker/Render) + macOS
+    search_paths_regular = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/TTF/DejaVuSans.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        # macOS
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/SFNSText.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+    ]
+    search_paths_bold = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
     ]
 
     regular = None
     bold = None
-    for p in search_paths:
+    for p in search_paths_regular:
         if os.path.exists(p):
-            if "Bold" in p:
-                bold = p
-            else:
-                regular = p
+            regular = p
+            break
+    for p in search_paths_bold:
+        if os.path.exists(p):
+            bold = p
+            break
 
+    # Try fc-list (Linux)
     if not regular:
         try:
             result = subprocess.run(
@@ -92,6 +104,18 @@ def _register_fonts():
             )
             if result.stdout.strip():
                 bold = result.stdout.strip().split("\n")[0]
+        except Exception:
+            pass
+
+    # macOS: try mdfind for any DejaVu font
+    if not regular:
+        try:
+            result = subprocess.run(
+                ["mdfind", "-name", "DejaVuSans.ttf"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.stdout.strip():
+                regular = result.stdout.strip().split("\n")[0]
         except Exception:
             pass
 
@@ -195,7 +219,8 @@ def _draw_bubble(c: canvas.Canvas, x: float, y: float,
 
 
 def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
-                         num_questions: int, options: list, columns: int):
+                         num_questions: int, options: list, columns: int,
+                         y_bottom: float = 0):
     questions_per_col = (num_questions + columns - 1) // columns
     available_width = PAGE_W - 2 * MARGIN
     col_width = available_width / columns
@@ -205,15 +230,29 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     col_gap = 3 * mm
     usable = col_width - q_num_width - col_gap
     sp_x = usable / num_options
-    bubble_r = min(2.3 * mm, sp_x * 0.4)
 
-    sp_y = 5.8 * mm
-    group_gap = 3.5 * mm
+    # Calculate spacing dynamically to fill available vertical space
+    num_groups = (questions_per_col - 1) // 5  # number of group gaps
+    available_height = y_start - y_bottom - 8 * mm  # header + padding
+    # total_height = questions_per_col * sp_y + num_groups * group_gap
+    # Solve for sp_y with group_gap = sp_y * 0.55
+    total_slots = questions_per_col + num_groups * 0.55
+    sp_y = available_height / max(total_slots, 1)
+    sp_y = min(sp_y, 16 * mm)  # cap max (allows 20q to spread)
+    sp_y = max(sp_y, 5.5 * mm)  # cap min
+    group_gap = sp_y * 0.55
+
+    # Scale bubble radius with row spacing for a balanced look
+    bubble_r = min(2.5 * mm, sp_x * 0.42, sp_y * 0.32)
+
+    # Scale font size with spacing
+    header_fs = min(8.5, max(7, sp_y / mm * 0.75))
+    q_fs = min(8.5, max(7, sp_y / mm * 0.7))
 
     # Column headers with accent underline
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
-        c.setFont(FONT_NAME_BOLD, 7)
+        c.setFont(FONT_NAME_BOLD, header_fs)
         c.setFillColor(ACCENT_DARK)
         for opt_idx, opt in enumerate(options):
             ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
@@ -254,7 +293,7 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
                        fill=1, stroke=0)
 
             # Question number
-            c.setFont(FONT_NAME_BOLD, 7)
+            c.setFont(FONT_NAME_BOLD, q_fs)
             c.setFillColor(DARK)
             c.drawRightString(col_x + q_num_width - 2 * mm, row_y - 1.8, str(q_num))
 
@@ -407,10 +446,11 @@ def generate_form_pdf(
     else:
         cols = 4
 
-    _draw_answer_section(c, MARGIN, answer_y, num_questions, options, cols)
+    footer_y = m + MARKER_SIZE + 2.5 * mm
+    _draw_answer_section(c, MARGIN, answer_y, num_questions, options, cols,
+                         y_bottom=footer_y + 6 * mm)
 
     # === Footer ===
-    footer_y = m + MARKER_SIZE + 2.5 * mm
 
     # Footer line
     c.setStrokeColor(ACCENT)
@@ -420,7 +460,7 @@ def generate_form_pdf(
     c.setFont(FONT_NAME, 6)
     c.setFillColor(ACCENT_DARK)
     c.drawCentredString(PAGE_W / 2, footer_y,
-                        "Made by Sena K\u00f6se \u2665")
+                        "Made by Sena K\u00f6se  \u2022  omr-scanner")
     c.setFillColor(black)
 
     c.save()
