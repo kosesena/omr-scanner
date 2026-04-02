@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: omr-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - form_data:/tmp/omr_forms
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: omr-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  form_data:
