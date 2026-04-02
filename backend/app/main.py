@@ -406,14 +406,14 @@ def _read_booklet_bubble(warped_gray: np.ndarray) -> str:
     h, w = warped_gray.shape[:2]
 
     # Booklet bubbles are on the NO: row, right side
-    # Approximate position: y ~ 0.155*h, x ~ 0.55*w to 0.70*w
+    # Approximate position: y ~ 0.155*h, x ~ 0.60*w to 0.76*w
     by = int(h * 0.155)
     bh = int(h * 0.022)
 
     # Bubble A region
-    ax1, ax2 = int(w * 0.56), int(w * 0.62)
+    ax1, ax2 = int(w * 0.60), int(w * 0.67)
     # Bubble B region
-    bx1, bx2 = int(w * 0.64), int(w * 0.70)
+    bx1, bx2 = int(w * 0.69), int(w * 0.76)
 
     region_a = warped_gray[by:by+bh, ax1:ax2]
     region_b = warped_gray[by:by+bh, bx1:bx2]

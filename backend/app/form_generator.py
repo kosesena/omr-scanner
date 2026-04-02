@@ -412,7 +412,7 @@ def generate_form_pdf(
                              box_size=box_size, label_width=label_w)
 
     # === Booklet selector (Kitapçık A/B) — same line as NO ===
-    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 10 * mm
+    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 25 * mm
     c.setFont(FONT_NAME_BOLD, 6.5)
     c.setFillColor(ACCENT_DARK)
     c.drawString(bk_x, no_row_y + box_size * 0.25, "K\u0130TAP\u00c7IK:")
