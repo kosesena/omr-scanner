@@ -106,14 +106,14 @@ def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E"):
         opt_list = ["A", "B", "C", "D", "E"]
 
     num_opts = len(opt_list)
-    filepath = os.path.join(FORMS_DIR, f"default_v3_{num_questions}q_{num_opts}opt.pdf")
-    if not os.path.exists(filepath):
-        generate_form_pdf(
-            num_questions=num_questions,
-            title=f"SINAV OPT\u0130K FORMU - {num_questions} SORU",
-            options=opt_list,
-            output_path=filepath,
-        )
+    filepath = os.path.join(FORMS_DIR, f"default_v4_{num_questions}q_{num_opts}opt.pdf")
+    # Always regenerate to pick up latest design changes
+    generate_form_pdf(
+        num_questions=num_questions,
+        title=f"SINAV OPT\u0130K FORMU - {num_questions} SORU",
+        options=opt_list,
+        output_path=filepath,
+    )
     return FileResponse(filepath, media_type="application/pdf",
                         filename=f"optik_form_{num_questions}q.pdf")
 
