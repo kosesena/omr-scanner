@@ -96,16 +96,22 @@ def generate_form(req: FormGenerateRequest):
 
 
 @app.get("/api/forms/download/{num_questions}")
-def download_default_form(num_questions: int = 40):
+def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E"):
     """Download a default form."""
     if num_questions not in [20, 40, 60, 80]:
         raise HTTPException(400, "Supported: 20, 40, 60, 80 questions")
 
-    filepath = os.path.join(FORMS_DIR, f"default_v2_{num_questions}q.pdf")
+    opt_list = [o.strip() for o in options.split(",") if o.strip()]
+    if not opt_list:
+        opt_list = ["A", "B", "C", "D", "E"]
+
+    num_opts = len(opt_list)
+    filepath = os.path.join(FORMS_DIR, f"default_v2_{num_questions}q_{num_opts}opt.pdf")
     if not os.path.exists(filepath):
         generate_form_pdf(
             num_questions=num_questions,
             title=f"SINAV OPTIK FORMU - {num_questions} SORU",
+            options=opt_list,
             output_path=filepath,
         )
     return FileResponse(filepath, media_type="application/pdf",

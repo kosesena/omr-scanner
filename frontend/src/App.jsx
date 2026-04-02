@@ -68,15 +68,29 @@ function Header({ page, setPage, session }) {
 
 function SetupPage({ session, setSession, setPage }) {
   const [numQ, setNumQ] = useState(40);
+  const [numOpts, setNumOpts] = useState(5);
   const [keys, setKeys] = useState({});
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [courseCode, setCourseCode] = useState("");
 
-  const options = ["A", "B", "C", "D", "E"];
+  const allOptions = ["A", "B", "C", "D", "E"];
+  const options = allOptions.slice(0, numOpts);
 
   const setAnswer = (q, ans) => {
     setKeys((prev) => ({ ...prev, [String(q)]: ans }));
+  };
+
+  const changeOpts = (n) => {
+    setNumOpts(n);
+    const valid = allOptions.slice(0, n);
+    setKeys((prev) => {
+      const cleaned = {};
+      for (const [q, v] of Object.entries(prev)) {
+        if (valid.includes(v)) cleaned[q] = v;
+      }
+      return cleaned;
+    });
   };
 
   const fillRandom = () => {
@@ -98,8 +112,9 @@ function SetupPage({ session, setSession, setPage }) {
       const res = await axios.post(`${API}/api/sessions/create`, {
         answers: keys,
         num_questions: numQ,
+        num_options: numOpts,
       });
-      setSession({ ...res.data, answer_key: keys, course_code: courseCode });
+      setSession({ ...res.data, answer_key: keys, course_code: courseCode, num_options: numOpts });
       setPage("roster");
     } catch (e) {
       alert("Hata: " + (e.response?.data?.detail || e.message));
@@ -110,7 +125,9 @@ function SetupPage({ session, setSession, setPage }) {
   const downloadForm = async () => {
     setFormLoading(true);
     try {
+      const optLabels = allOptions.slice(0, numOpts);
       const res = await axios.get(`${API}/api/forms/download/${numQ}`, {
+        params: { options: optLabels.join(",") },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);
@@ -146,6 +163,26 @@ function SetupPage({ session, setSession, setPage }) {
                 )}
               >
                 {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <label className="text-sm text-slate-600 dark:text-slate-400">Sik sayisi:</label>
+          <div className="flex gap-2">
+            {[4, 5].map((n) => (
+              <button
+                key={n}
+                onClick={() => changeOpts(n)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                  numOpts === n
+                    ? "bg-blue-500 text-white shadow-md"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                )}
+              >
+                {n === 4 ? "A-B-C-D" : "A-B-C-D-E"}
               </button>
             ))}
           </div>
