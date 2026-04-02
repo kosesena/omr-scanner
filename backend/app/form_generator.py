@@ -1,9 +1,9 @@
 """
 OMR Optical Form PDF Generator
-Generates printable A4 answer sheets with:
-- 4 ArUco markers at corners (for perspective correction)
-- Student ID bubble grid (10 digits, each 0-9)
-- Answer bubbles (configurable questions, A-B-C-D-E)
+Clean, Gradescope-style answer sheets with:
+- 4 ArUco markers at corners
+- Student info fields (Name, ID, Class, Date)
+- Answer bubbles grouped in blocks of 5
 """
 
 import cv2
@@ -17,185 +17,133 @@ import tempfile
 import os
 
 
-# --- Constants ---
-PAGE_W, PAGE_H = A4  # 210mm x 297mm
-MARGIN = 12 * mm
+PAGE_W, PAGE_H = A4
+MARGIN = 15 * mm
 
-# ArUco marker config
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
-MARKER_SIZE_MM = 10
-MARKER_SIZE = MARKER_SIZE_MM * mm
+MARKER_SIZE = 9 * mm
 
-# Colors
-LIGHT_GRAY = HexColor("#E8E8E8")
-DARK_GRAY = HexColor("#333333")
-MID_GRAY = HexColor("#999999")
-HEADER_BG = HexColor("#2C3E50")
-ACCENT = HexColor("#3498DB")
+DARK = HexColor("#222222")
+MID = HexColor("#888888")
+LIGHT = HexColor("#CCCCCC")
 
 
-def generate_aruco_marker(marker_id: int, size_px: int = 100) -> np.ndarray:
+def generate_aruco_marker(marker_id: int, size_px: int = 200) -> np.ndarray:
     aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
-    marker_img = cv2.aruco.generateImageMarker(aruco_dict, marker_id, size_px)
-    return marker_img
+    return cv2.aruco.generateImageMarker(aruco_dict, marker_id, size_px)
 
 
 def draw_aruco_marker(c: canvas.Canvas, x: float, y: float, marker_id: int):
-    size_px = 200
-    marker_img = generate_aruco_marker(marker_id, size_px)
+    marker_img = generate_aruco_marker(marker_id)
     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     cv2.imwrite(tmp.name, marker_img)
     c.drawImage(tmp.name, x, y, width=MARKER_SIZE, height=MARKER_SIZE)
     os.unlink(tmp.name)
 
 
-def draw_bubble(c: canvas.Canvas, x: float, y: float, label: str,
-                radius: float = 2.0 * mm, font_size: float = 5.5):
-    """Draw a single OMR bubble."""
-    c.setStrokeColor(MID_GRAY)
-    c.setLineWidth(0.4)
-    c.circle(x, y, radius, fill=0, stroke=1)
-    c.setFillColor(DARK_GRAY)
-    c.setFont("Helvetica", font_size)
-    c.drawCentredString(x, y - font_size * 0.35, label)
+def draw_bubble(c: canvas.Canvas, x: float, y: float, label: str, r: float):
+    """Draw a single clean bubble."""
+    c.setStrokeColor(LIGHT)
+    c.setLineWidth(0.5)
+    c.circle(x, y, r, fill=0, stroke=1)
+    c.setFillColor(MID)
+    c.setFont("Helvetica", r * 1.8)
+    c.drawCentredString(x, y - r * 0.4, label)
+    c.setFillColor(black)
     c.setStrokeColor(black)
-    c.setFillColor(black)
 
 
-def draw_student_id_section(c: canvas.Canvas, x_start: float, y_start: float,
-                            num_digits: int = 10):
-    """Draw the student ID bubble grid."""
-    bubble_r = 2.0 * mm
-    sp_x = 6.0 * mm  # horizontal spacing between digit columns
-    sp_y = 5.5 * mm  # vertical spacing between rows
+def draw_info_section(c: canvas.Canvas, x: float, y: float):
+    """Draw student info fields like Gradescope."""
+    fields_left = [("Name", 70 * mm), ("ID", 70 * mm)]
+    fields_right = [("Class", 30 * mm), ("Date", 30 * mm)]
 
-    section_width = num_digits * sp_x + 8 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(DARK)
 
-    # Section header
-    c.setFillColor(HEADER_BG)
-    c.roundRect(x_start - 1 * mm, y_start + 1 * mm,
-                section_width, 5.5 * mm, 2, fill=1, stroke=0)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 6.5)
-    c.drawString(x_start + 1 * mm, y_start + 2.8 * mm, "STUDENT NO")
-    c.setFillColor(black)
+    # Left fields
+    cy = y
+    for label, width in fields_left:
+        c.drawString(x, cy, label)
+        c.setStrokeColor(LIGHT)
+        c.setLineWidth(0.8)
+        c.line(x + 15 * mm, cy - 1, x + width, cy - 1)
+        c.setStrokeColor(black)
+        cy -= 8 * mm
 
-    # Column headers (1, 2, 3, ...)
-    c.setFont("Helvetica-Bold", 5.5)
-    c.setFillColor(ACCENT)
-    for col in range(num_digits):
-        cx = x_start + 3 * mm + col * sp_x
-        c.drawCentredString(cx, y_start - 2 * mm, str(col + 1))
-    c.setFillColor(black)
+    # Right fields
+    cy = y
+    rx = PAGE_W / 2 + 10 * mm
+    for label, width in fields_right:
+        c.drawString(rx, cy, label)
+        c.setStrokeColor(LIGHT)
+        c.setLineWidth(0.8)
+        c.line(rx + 15 * mm, cy - 1, rx + width + 15 * mm, cy - 1)
+        c.setStrokeColor(black)
+        cy -= 8 * mm
 
-    # Bubble grid: 10 rows (0-9) x num_digits columns
-    for row in range(10):
-        ry = y_start - 5 * mm - row * sp_y
-
-        # Row label
-        c.setFillColor(MID_GRAY)
-        c.setFont("Helvetica", 5)
-        c.drawRightString(x_start - 2 * mm, ry - 1.8, str(row))
-        c.setFillColor(black)
-
-        for col in range(num_digits):
-            cx = x_start + 3 * mm + col * sp_x
-            draw_bubble(c, cx, ry, str(row), radius=bubble_r, font_size=5)
-
-    bottom_y = y_start - 5 * mm - 9 * sp_y - 3 * mm
-    return bottom_y
+    return y - len(fields_left) * 8 * mm - 4 * mm
 
 
 def draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
-                        num_questions: int = 40, options: list = None,
-                        columns: int = 4):
-    """Draw the answer bubbles section."""
-    if options is None:
-        options = ["A", "B", "C", "D", "E"]
+                        num_questions: int, options: list, columns: int):
+    """Draw answer bubbles in clean columns, grouped by 5."""
 
-    num_options = len(options)
     questions_per_col = (num_questions + columns - 1) // columns
-
     available_width = PAGE_W - 2 * MARGIN
     col_width = available_width / columns
 
-    # Calculate spacing to fit within column
-    # Layout per column: [q_num_space] [opt1] [opt2] [opt3] [opt4] [opt5] [gap]
-    q_num_space = 7 * mm  # space for question number
-    right_gap = 2 * mm    # gap at right of column
-    bubble_area = col_width - q_num_space - right_gap
-    sp_x = bubble_area / num_options  # spacing between option bubbles
+    # Calculate bubble sizing
+    num_options = len(options)
+    q_num_width = 9 * mm
+    col_gap = 3 * mm
+    usable = col_width - q_num_width - col_gap
+    sp_x = usable / num_options
+    bubble_r = min(2.2 * mm, sp_x * 0.4)
 
-    # Clamp bubble radius to not exceed half of spacing
-    bubble_r = min(2.0 * mm, sp_x * 0.38)
-    font_size = min(5.5, bubble_r / mm * 2.8)
-    q_font_size = font_size + 0.5
+    # Vertical spacing
+    sp_y = 5.8 * mm
+    group_gap = 3.5 * mm  # extra space every 5 questions
 
-    # Vertical spacing - fit in available height
-    available_height = y_start - (MARGIN + MARKER_SIZE + 10 * mm)
-    sp_y = min(6.5 * mm, available_height / (questions_per_col + 1))
-    sp_y = max(sp_y, 4.5 * mm)  # minimum readable spacing
-
-    # Section header
-    c.setFillColor(HEADER_BG)
-    c.roundRect(x_start - 1 * mm, y_start + 1 * mm,
-                available_width + 2 * mm, 5.5 * mm, 2, fill=1, stroke=0)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 6.5)
-    c.drawString(x_start + 1 * mm, y_start + 2.8 * mm,
-                 f"ANSWERS  ({num_questions} questions)")
-    c.setFillColor(black)
-
+    # Column headers: A B C D E
+    c.setFont("Helvetica-Bold", 7)
+    c.setFillColor(DARK)
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
+        for opt_idx, opt in enumerate(options):
+            ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
+            c.drawCentredString(ox, y_start + 2 * mm, opt)
+    c.setFillColor(black)
 
+    # Draw questions
+    for col_idx in range(columns):
+        col_x = x_start + col_idx * col_width
         q_start = col_idx * questions_per_col
 
-        # Column option headers (A, B, C, D, E)
-        c.setFont("Helvetica-Bold", max(font_size, 4.5))
-        c.setFillColor(ACCENT)
-        for opt_idx, opt in enumerate(options):
-            ox = col_x + q_num_space + opt_idx * sp_x
-            c.drawCentredString(ox, y_start - 2.5 * mm, opt)
-        c.setFillColor(black)
+        row_y = y_start - 4 * mm
 
-        # Draw question rows
         for row in range(questions_per_col):
             q_num = q_start + row + 1
             if q_num > num_questions:
                 break
 
-            ry = y_start - 6 * mm - row * sp_y
-
-            # Alternating row background
-            if row % 2 == 0:
-                c.setFillColor(HexColor("#F5F5F5"))
-                c.rect(col_x, ry - bubble_r - 0.8 * mm,
-                       col_width - 1 * mm, sp_y, fill=1, stroke=0)
-                c.setFillColor(black)
+            # Add group gap every 5 questions
+            if row > 0 and row % 5 == 0:
+                row_y -= group_gap
 
             # Question number
-            c.setFont("Helvetica-Bold", q_font_size)
-            c.setFillColor(DARK_GRAY)
-            c.drawRightString(col_x + q_num_space - 2 * mm, ry - 1.8, str(q_num))
-            c.setFillColor(black)
+            c.setFont("Helvetica-Bold", 7)
+            c.setFillColor(DARK)
+            c.drawRightString(col_x + q_num_width - 2 * mm, row_y - 2, str(q_num))
 
             # Option bubbles
             for opt_idx, opt in enumerate(options):
-                ox = col_x + q_num_space + opt_idx * sp_x
-                draw_bubble(c, ox, ry, opt, radius=bubble_r, font_size=font_size)
+                ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
+                draw_bubble(c, ox, row_y, opt, bubble_r)
 
-        # Column separator
-        if col_idx < columns - 1:
-            sep_x = col_x + col_width - 0.5 * mm
-            c.setStrokeColor(LIGHT_GRAY)
-            c.setLineWidth(0.3)
-            c.line(sep_x, y_start - 3 * mm,
-                   sep_x, y_start - 6 * mm - questions_per_col * sp_y)
-            c.setStrokeColor(black)
+            row_y -= sp_y
 
-    bottom_y = y_start - 6 * mm - questions_per_col * sp_y
-    return bottom_y
+    c.setFillColor(black)
 
 
 def generate_form_pdf(
@@ -211,65 +159,64 @@ def generate_form_pdf(
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    # --- ArUco markers at 4 corners ---
-    marker_margin = 6 * mm
-    draw_aruco_marker(c, marker_margin,
-                      PAGE_H - marker_margin - MARKER_SIZE, 0)
-    draw_aruco_marker(c, PAGE_W - marker_margin - MARKER_SIZE,
-                      PAGE_H - marker_margin - MARKER_SIZE, 1)
-    draw_aruco_marker(c, marker_margin, marker_margin, 2)
-    draw_aruco_marker(c, PAGE_W - marker_margin - MARKER_SIZE,
-                      marker_margin, 3)
+    # --- ArUco markers at corners ---
+    m = 6 * mm
+    draw_aruco_marker(c, m, PAGE_H - m - MARKER_SIZE, 0)
+    draw_aruco_marker(c, PAGE_W - m - MARKER_SIZE, PAGE_H - m - MARKER_SIZE, 1)
+    draw_aruco_marker(c, m, m, 2)
+    draw_aruco_marker(c, PAGE_W - m - MARKER_SIZE, m, 3)
 
     # --- Title ---
-    title_y = PAGE_H - marker_margin - MARKER_SIZE - 5 * mm
-    c.setFont("Helvetica-Bold", 12)
-    c.setFillColor(HEADER_BG)
+    title_y = PAGE_H - m - MARKER_SIZE - 8 * mm
+    c.setFont("Helvetica-Bold", 13)
+    c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, title_y, title)
 
-    # Accent line
-    c.setStrokeColor(ACCENT)
-    c.setLineWidth(1.2)
+    # Thin line under title
+    c.setStrokeColor(LIGHT)
+    c.setLineWidth(0.8)
     c.line(MARGIN, title_y - 3 * mm, PAGE_W - MARGIN, title_y - 3 * mm)
+    c.setStrokeColor(black)
 
-    # --- Name/Class ---
+    # --- Student info ---
     info_y = title_y - 10 * mm
-    c.setFont("Helvetica", 7)
-    c.setFillColor(DARK_GRAY)
-    c.drawString(MARGIN, info_y, "Name: ____________________________")
-    c.drawString(PAGE_W / 2, info_y, "Class: ________  Date: ________")
+    info_bottom = draw_info_section(c, MARGIN, info_y)
 
-    # --- Student ID ---
-    id_y = info_y - 8 * mm
-    id_bottom = draw_student_id_section(c, MARGIN + 2 * mm, id_y, num_id_digits)
+    # --- Marking instruction ---
+    inst_y = info_bottom - 2 * mm
+    c.setFont("Helvetica", 6)
+    c.setFillColor(MID)
+    c.drawString(MARGIN, inst_y,
+                 "Fill bubbles completely with dark pen/pencil. Do not fold or damage.")
 
-    # --- Answers ---
-    answer_y = id_bottom - 2 * mm
+    # Example bubble
+    ex_x = PAGE_W - MARGIN - 30 * mm
+    c.setFont("Helvetica", 6)
+    c.drawString(ex_x, inst_y, "Example:")
+    c.setFillColor(DARK)
+    c.circle(ex_x + 18 * mm, inst_y + 1.5, 2.2 * mm, fill=1, stroke=0)
+    c.setFillColor(black)
 
-    if num_questions <= 20:
+    # --- Answer section ---
+    answer_y = inst_y - 8 * mm
+
+    # Determine columns
+    if num_questions <= 25:
         cols = 2
-    elif num_questions <= 60:
+    elif num_questions <= 50:
+        cols = 2
+    elif num_questions <= 100:
         cols = 4
     else:
-        cols = 5
+        cols = 4
 
     draw_answer_section(c, MARGIN, answer_y, num_questions, options, cols)
 
     # --- Footer ---
     c.setFont("Helvetica", 5)
-    c.setFillColor(MID_GRAY)
-    c.drawCentredString(PAGE_W / 2, marker_margin + MARKER_SIZE + 2 * mm,
-                        "Do not fold or damage. Fill bubbles completely with dark pen/pencil.")
-
-    # --- Timing marks ---
-    mark_size = 2 * mm
-    c.setFillColor(black)
-    for i in range(20):
-        my = answer_y - 5 * mm - i * 6 * mm
-        if my < marker_margin + MARKER_SIZE + 6 * mm:
-            break
-        c.rect(MARGIN - 4.5 * mm, my - mark_size / 2,
-               mark_size, mark_size, fill=1, stroke=0)
+    c.setFillColor(MID)
+    c.drawCentredString(PAGE_W / 2, m + MARKER_SIZE + 2 * mm,
+                        f"OMR Scanner Form  |  {num_questions} Questions")
 
     c.setFillColor(black)
     c.save()
