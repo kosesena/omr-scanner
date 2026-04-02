@@ -104,6 +104,7 @@ class OMREngine:
         self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
+        self.last_warped_gray = None  # stored for OCR after scan
 
         # Get answer layout
         self._setup_answer_layout()
@@ -420,6 +421,9 @@ class OMREngine:
         # Enhance contrast
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         warped_gray = clahe.apply(warped_gray)
+
+        # Store for OCR engine
+        self.last_warped_gray = warped_gray
 
         # Step 3: Read student ID
         student_id, id_conf = self.read_student_id(warped_gray)
