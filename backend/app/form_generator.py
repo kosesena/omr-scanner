@@ -406,24 +406,25 @@ def generate_form_pdf(
                              box_size=box_size, label_width=label_w)
     box_y = _draw_char_boxes(c, MARGIN, box_y, "SOYAD:", actual_surname_boxes,
                              box_size=box_size, label_width=label_w)
+    # Save NO row y before it moves down
+    no_row_y = box_y
     box_y = _draw_char_boxes(c, MARGIN, box_y, "NO:", actual_no_boxes,
                              box_size=box_size, label_width=label_w)
 
-    # === Booklet selector (Kitapçık A/B) ===
-    booklet_y = box_y + 1 * mm
-    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 8 * mm
-    c.setFont(FONT_NAME_BOLD, 7)
+    # === Booklet selector (Kitapçık A/B) — same line as NO ===
+    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 10 * mm
+    c.setFont(FONT_NAME_BOLD, 6.5)
     c.setFillColor(ACCENT_DARK)
-    c.drawString(bk_x, booklet_y + box_size * 0.25, "KITAP\u00c7IK:")
-    bk_label_w = c.stringWidth("KITAP\u00c7IK:", FONT_NAME_BOLD, 7) + 3 * mm
+    c.drawString(bk_x, no_row_y + box_size * 0.25, "K\u0130TAP\u00c7IK:")
+    bk_label_w = c.stringWidth("K\u0130TAP\u00c7IK:", FONT_NAME_BOLD, 6.5) + 2 * mm
     for i, bk in enumerate(["A", "B"]):
-        bx = bk_x + bk_label_w + i * 10 * mm
+        bx = bk_x + bk_label_w + i * 8 * mm
         c.setStrokeColor(BUBBLE_BORDER)
         c.setLineWidth(0.5)
-        c.circle(bx + 3 * mm, booklet_y + box_size * 0.35, 2.5 * mm, fill=0, stroke=1)
+        c.circle(bx, no_row_y + box_size * 0.4, 2.3 * mm, fill=0, stroke=1)
         c.setFillColor(BUBBLE_TEXT)
-        c.setFont(FONT_NAME_BOLD, 6)
-        c.drawCentredString(bx + 3 * mm, booklet_y + box_size * 0.35 - 2, bk)
+        c.setFont(FONT_NAME_BOLD, 5.5)
+        c.drawCentredString(bx, no_row_y + box_size * 0.4 - 1.8, bk)
     c.setFillColor(black)
     c.setStrokeColor(black)
 
