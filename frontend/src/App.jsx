@@ -4,31 +4,31 @@ import axios from "axios";
 import {
   Camera, FileText, BarChart3, Settings, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, Download, Plus,
-  Scan, RotateCcw, Users, Trophy, Target, Upload
+  Scan, RotateCcw, Users, Trophy, Target, Upload,
+  ClipboardList, Eye, Edit3, Check, X, UserPlus
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-// ============================================================
-// Utility
-// ============================================================
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
 // ============================================================
-// Components
+// Header
 // ============================================================
 
 function Header({ page, setPage, session }) {
   const tabs = [
-    { id: "setup", label: "Setup", icon: Settings },
-    { id: "scan", label: "Scan", icon: Scan },
-    { id: "results", label: "Results", icon: BarChart3 },
+    { id: "setup", label: "Ayarlar", icon: Settings },
+    { id: "roster", label: "Sınıf Listesi", icon: ClipboardList },
+    { id: "scan", label: "Tara", icon: Scan },
+    { id: "review", label: "Doğrula", icon: Eye },
+    { id: "results", label: "Sonuçlar", icon: BarChart3 },
   ];
   return (
     <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-3xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
           <h1 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Scan className="w-5 h-5 text-blue-500" />
@@ -36,23 +36,23 @@ function Header({ page, setPage, session }) {
           </h1>
           {session && (
             <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-              {session.num_questions}Q
+              {session.num_questions}S
             </span>
           )}
         </div>
-        <nav className="flex gap-1 -mb-px">
+        <nav className="flex gap-0.5 -mb-px overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setPage(t.id)}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
                 page === t.id
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
               )}
             >
-              <t.icon className="w-4 h-4" />
+              <t.icon className="w-3.5 h-3.5" />
               {t.label}
             </button>
           ))}
@@ -62,13 +62,16 @@ function Header({ page, setPage, session }) {
   );
 }
 
-// ==================== SETUP PAGE ====================
+// ============================================================
+// Setup Page
+// ============================================================
 
 function SetupPage({ session, setSession, setPage }) {
   const [numQ, setNumQ] = useState(40);
   const [keys, setKeys] = useState({});
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [courseCode, setCourseCode] = useState("");
 
   const options = ["A", "B", "C", "D", "E"];
 
@@ -87,7 +90,7 @@ function SetupPage({ session, setSession, setPage }) {
   const createSession = async () => {
     const filled = Object.keys(keys).length;
     if (filled < numQ) {
-      alert(`Please fill all ${numQ} answers. Currently: ${filled}`);
+      alert(`Tüm ${numQ} cevabı doldurun. Şu an: ${filled}`);
       return;
     }
     setLoading(true);
@@ -96,10 +99,10 @@ function SetupPage({ session, setSession, setPage }) {
         answers: keys,
         num_questions: numQ,
       });
-      setSession({ ...res.data, answer_key: keys });
-      setPage("scan");
+      setSession({ ...res.data, answer_key: keys, course_code: courseCode });
+      setPage("roster");
     } catch (e) {
-      alert("Error creating session: " + (e.response?.data?.detail || e.message));
+      alert("Hata: " + (e.response?.data?.detail || e.message));
     }
     setLoading(false);
   };
@@ -117,18 +120,19 @@ function SetupPage({ session, setSession, setPage }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert("Error downloading form");
+      alert("Form indirme hatası");
     }
     setFormLoading(false);
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-6">
-      {/* Question count */}
+    <div className="max-w-3xl mx-auto p-4 space-y-5">
+      {/* Exam setup */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Exam setup</h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Questions:</label>
+        <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Sınav Ayarları</h2>
+
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <label className="text-sm text-slate-600 dark:text-slate-400">Soru sayısı:</label>
           <div className="flex gap-2">
             {[20, 40, 60, 80, 100].map((n) => (
               <button
@@ -138,7 +142,7 @@ function SetupPage({ session, setSession, setPage }) {
                   "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
                   numQ === n
                     ? "bg-blue-500 text-white shadow-md"
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                 )}
               >
                 {n}
@@ -147,39 +151,47 @@ function SetupPage({ session, setSession, setPage }) {
           </div>
         </div>
 
+        <div className="flex items-center gap-3 mb-3">
+          <label className="text-sm text-slate-600 dark:text-slate-400">Ders kodu:</label>
+          <input
+            type="text"
+            value={courseCode}
+            onChange={(e) => setCourseCode(e.target.value)}
+            placeholder="ör: MAT101"
+            className="px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white w-32"
+          />
+        </div>
+
         <button
           onClick={downloadForm}
           disabled={formLoading}
-          className="mt-3 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
           <Download className="w-4 h-4" />
-          {formLoading ? "Downloading..." : "Download printable form (PDF)"}
+          {formLoading ? "İndiriliyor..." : "Optik form indir (PDF)"}
         </button>
       </div>
 
       {/* Answer key */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Answer key</h2>
-          <button
-            onClick={fillRandom}
-            className="text-xs text-blue-500 hover:underline"
-          >
-            Fill random (for testing)
+          <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
+          <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline">
+            Rastgele doldur (test)
           </button>
         </div>
 
         <div className="flex flex-col gap-1">
           {Array.from({ length: numQ }, (_, i) => i + 1).map((q) => (
-            <div key={q} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50">
+            <div key={q} className="flex items-center gap-3 py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50">
               <span className="text-sm font-semibold text-slate-500 w-8 text-right shrink-0">{q}.</span>
-              <div className="flex gap-2 flex-1">
+              <div className="flex gap-1.5">
                 {options.map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setAnswer(q, opt)}
                     className={cn(
-                      "w-9 h-9 rounded-full text-sm font-bold transition-all",
+                      "w-9 h-9 rounded-full text-xs font-bold transition-all",
                       keys[String(q)] === opt
                         ? "bg-blue-500 text-white scale-110 shadow"
                         : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200"
@@ -195,14 +207,14 @@ function SetupPage({ session, setSession, setPage }) {
 
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-slate-500">
-            {Object.keys(keys).length}/{numQ} filled
+            {Object.keys(keys).length}/{numQ} dolduruldu
           </span>
           <button
             onClick={createSession}
             disabled={loading}
-            className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium text-sm transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium text-sm transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
           >
-            {loading ? "Creating..." : "Start scanning"}
+            {loading ? "Oluşturuluyor..." : "Devam et"}
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -211,7 +223,209 @@ function SetupPage({ session, setSession, setPage }) {
   );
 }
 
-// ==================== SCAN PAGE ====================
+// ============================================================
+// Roster Page (Sınıf Listesi)
+// ============================================================
+
+function RosterPage({ session, setPage }) {
+  const [students, setStudents] = useState([]);
+  const [name, setName] = useState("");
+  const [surname, setSurname] = useState("");
+  const [studentNo, setStudentNo] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [showBulk, setShowBulk] = useState(false);
+
+  const addStudent = () => {
+    if (!name.trim() || !surname.trim() || !studentNo.trim()) {
+      alert("Ad, soyad ve numara zorunlu");
+      return;
+    }
+    setStudents([...students, {
+      name: name.toUpperCase().trim(),
+      surname: surname.toUpperCase().trim(),
+      student_number: studentNo.trim(),
+    }]);
+    setName("");
+    setSurname("");
+    setStudentNo("");
+  };
+
+  const parseBulk = () => {
+    const lines = bulkText.trim().split("\n").filter(Boolean);
+    const parsed = [];
+    for (const line of lines) {
+      const parts = line.split(/[,;\t]+/).map(s => s.trim());
+      if (parts.length >= 3) {
+        parsed.push({
+          name: parts[0].toUpperCase(),
+          surname: parts[1].toUpperCase(),
+          student_number: parts[2],
+        });
+      } else if (parts.length === 2) {
+        parsed.push({
+          name: parts[0].toUpperCase(),
+          surname: parts[1].toUpperCase(),
+          student_number: "",
+        });
+      }
+    }
+    setStudents([...students, ...parsed]);
+    setBulkText("");
+    setShowBulk(false);
+  };
+
+  const removeStudent = (idx) => {
+    setStudents(students.filter((_, i) => i !== idx));
+  };
+
+  const uploadRoster = async () => {
+    if (!session) {
+      alert("Önce sınav oluşturun");
+      return;
+    }
+    if (students.length === 0) {
+      // Skip roster, go directly to scan
+      setPage("scan");
+      return;
+    }
+    setUploading(true);
+    try {
+      await axios.post(`${API}/api/sessions/${session.session_id}/roster`, {
+        students: students,
+      });
+      setPage("scan");
+    } catch (e) {
+      alert("Yükleme hatası: " + (e.response?.data?.detail || e.message));
+    }
+    setUploading(false);
+  };
+
+  if (!session) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 text-center text-slate-500 mt-20">
+        <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p>Önce Ayarlar sekmesinden sınav oluşturun</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Sınıf Listesi</h2>
+        <p className="text-xs text-slate-500 mb-4">
+          Öğrenci listesini girin. Tarama sonuçları otomatik eşleştirilecek. (İsteğe bağlı — atlayabilirsiniz)
+        </p>
+
+        {/* Single add */}
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ad"
+            className="flex-1 min-w-[80px] px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+          />
+          <input
+            type="text"
+            value={surname}
+            onChange={(e) => setSurname(e.target.value)}
+            placeholder="Soyad"
+            className="flex-1 min-w-[80px] px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+          />
+          <input
+            type="text"
+            value={studentNo}
+            onChange={(e) => setStudentNo(e.target.value)}
+            placeholder="No"
+            className="w-24 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+          />
+          <button
+            onClick={addStudent}
+            className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
+          >
+            <UserPlus className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Bulk add toggle */}
+        <button
+          onClick={() => setShowBulk(!showBulk)}
+          className="text-xs text-blue-500 hover:underline mb-3"
+        >
+          {showBulk ? "Kapat" : "Toplu ekle (yapıştır)"}
+        </button>
+
+        {showBulk && (
+          <div className="mb-3">
+            <textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={"Ad, Soyad, Numara (her satıra bir öğrenci)\nSENA, KOSE, 214501\nALI, YILMAZ, 214502"}
+              rows={5}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-mono"
+            />
+            <button
+              onClick={parseBulk}
+              className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600"
+            >
+              Ekle ({bulkText.trim().split("\n").filter(Boolean).length} satır)
+            </button>
+          </div>
+        )}
+
+        {/* Student list */}
+        {students.length > 0 && (
+          <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-700">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">#</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ad</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Soyad</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
+                  <th className="px-3 py-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s, i) => (
+                  <tr key={i} className="border-t border-slate-100 dark:border-slate-600">
+                    <td className="px-3 py-1.5 text-slate-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 text-slate-900 dark:text-white">{s.name}</td>
+                    <td className="px-3 py-1.5 text-slate-900 dark:text-white">{s.surname}</td>
+                    <td className="px-3 py-1.5 text-slate-600 dark:text-slate-400 font-mono">{s.student_number}</td>
+                    <td className="px-3 py-1.5">
+                      <button onClick={() => removeStudent(i)} className="text-red-400 hover:text-red-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-sm text-slate-500">{students.length} öğrenci</span>
+          <button
+            onClick={uploadRoster}
+            disabled={uploading}
+            className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium text-sm transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+          >
+            {uploading ? "Yükleniyor..." : students.length > 0 ? "Kaydet ve taramaya geç" : "Atla, taramaya geç"}
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Scan Page
+// ============================================================
 
 function ScanPage({ session, setResults, results }) {
   const webcamRef = useRef(null);
@@ -234,21 +448,14 @@ function ScanPage({ session, setResults, results }) {
       const formData = new FormData();
       formData.append("image_base64", base64Image);
       formData.append("num_questions", session.num_questions);
-      if (session.session_id) {
-        formData.append("session_id", session.session_id);
-      }
-      if (session.answer_key) {
-        formData.append("answer_key", JSON.stringify(session.answer_key));
-      }
+      if (session.session_id) formData.append("session_id", session.session_id);
+      if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
 
       const res = await axios.post(`${API}/api/scan/base64`, formData);
       setLastResult(res.data);
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
-      setLastResult({
-        success: false,
-        error: e.response?.data?.detail || e.message,
-      });
+      setLastResult({ success: false, error: e.response?.data?.detail || e.message });
     }
     setScanning(false);
   };
@@ -261,21 +468,14 @@ function ScanPage({ session, setResults, results }) {
       const formData = new FormData();
       formData.append("image", file);
       formData.append("num_questions", session.num_questions);
-      if (session.session_id) {
-        formData.append("session_id", session.session_id);
-      }
-      if (session.answer_key) {
-        formData.append("answer_key", JSON.stringify(session.answer_key));
-      }
+      if (session.session_id) formData.append("session_id", session.session_id);
+      if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
 
       const res = await axios.post(`${API}/api/scan`, formData);
       setLastResult(res.data);
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
-      setLastResult({
-        success: false,
-        error: e.response?.data?.detail || e.message,
-      });
+      setLastResult({ success: false, error: e.response?.data?.detail || e.message });
     }
     setScanning(false);
     e.target.value = "";
@@ -283,42 +483,38 @@ function ScanPage({ session, setResults, results }) {
 
   if (!session) {
     return (
-      <div className="max-w-2xl mx-auto p-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl mx-auto p-4 text-center text-slate-500 mt-20">
         <Scan className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p>Create a session first in Setup tab</p>
+        <p>Önce Ayarlar sekmesinden sınav oluşturun</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
       {/* Camera / Upload toggle */}
       <div className="flex gap-2">
         <button
           onClick={() => setUseCamera(true)}
           className={cn(
-            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all",
-            useCamera
-              ? "bg-blue-500 text-white"
-              : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+            useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600"
           )}
         >
-          <Camera className="w-4 h-4" /> Camera
+          <Camera className="w-4 h-4" /> Kamera
         </button>
         <button
           onClick={() => setUseCamera(false)}
           className={cn(
-            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all",
-            !useCamera
-              ? "bg-blue-500 text-white"
-              : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+            !useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600"
           )}
         >
-          <Upload className="w-4 h-4" /> Upload
+          <Upload className="w-4 h-4" /> Yükle
         </button>
       </div>
 
-      {/* Camera view */}
+      {/* Camera */}
       {useCamera ? (
         <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4]">
           <Webcam
@@ -326,34 +522,23 @@ function ScanPage({ session, setResults, results }) {
             audio={false}
             screenshotFormat="image/jpeg"
             screenshotQuality={0.95}
-            videoConstraints={{
-              facingMode,
-              width: { ideal: 1920 },
-              height: { ideal: 2560 },
-            }}
+            videoConstraints={{ facingMode, width: { ideal: 1920 }, height: { ideal: 2560 } }}
             className="w-full h-full object-cover"
           />
-          {/* Overlay guide */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-8 border-2 border-white/40 rounded-lg" />
-            <div className="absolute top-10 left-10 w-8 h-8 border-t-3 border-l-3 border-blue-400 rounded-tl-md" />
-            <div className="absolute top-10 right-10 w-8 h-8 border-t-3 border-r-3 border-blue-400 rounded-tr-md" />
-            <div className="absolute bottom-10 left-10 w-8 h-8 border-b-3 border-l-3 border-blue-400 rounded-bl-md" />
-            <div className="absolute bottom-10 right-10 w-8 h-8 border-b-3 border-r-3 border-blue-400 rounded-br-md" />
+            <div className="absolute inset-8 border-2 border-white/30 rounded-lg" />
           </div>
-
-          {/* Controls */}
           <div className="absolute bottom-4 inset-x-4 flex items-center justify-center gap-4">
             <button
               onClick={() => setFacingMode(f => f === "environment" ? "user" : "environment")}
-              className="p-3 bg-white/20 backdrop-blur rounded-full text-white hover:bg-white/30"
+              className="p-3 bg-white/20 backdrop-blur rounded-full text-white"
             >
               <RotateCcw className="w-5 h-5" />
             </button>
             <button
               onClick={capture}
               disabled={scanning}
-              className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-50"
+              className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center disabled:opacity-50"
             >
               {scanning ? (
                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -361,37 +546,33 @@ function ScanPage({ session, setResults, results }) {
                 <div className="w-12 h-12 bg-blue-500 rounded-full" />
               )}
             </button>
-            <div className="w-11" /> {/* spacer */}
+            <div className="w-11" />
           </div>
         </div>
       ) : (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
+          className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400"
         >
           <Upload className="w-10 h-10 mx-auto mb-3 text-slate-400" />
-          <p className="text-sm text-slate-500">Tap to select a photo of the answer sheet</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+          <p className="text-sm text-slate-500">Optik form fotoğrafı seçin</p>
+          <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+            onChange={handleFileUpload} className="hidden" />
         </div>
       )}
 
-      {/* Scan count */}
       <div className="text-center text-sm text-slate-500">
-        {results.filter(r => r.success).length} sheets scanned
+        {results.filter(r => r.success).length} form tarandı
       </div>
 
-      {/* Last result */}
       {lastResult && <ResultCard result={lastResult} answerKey={session.answer_key} />}
     </div>
   );
 }
+
+// ============================================================
+// Result Card
+// ============================================================
 
 function ResultCard({ result, answerKey }) {
   const [expanded, setExpanded] = useState(false);
@@ -399,9 +580,9 @@ function ResultCard({ result, answerKey }) {
   if (!result.success) {
     return (
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-        <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+        <div className="flex items-center gap-2 text-red-600">
           <XCircle className="w-5 h-5" />
-          <span className="font-medium">Scan failed</span>
+          <span className="font-medium">Tarama başarısız</span>
         </div>
         <p className="text-sm text-red-500 mt-1">{result.error}</p>
       </div>
@@ -412,19 +593,34 @@ function ResultCard({ result, answerKey }) {
     result.score >= 70 ? "text-green-600" :
     result.score >= 50 ? "text-amber-600" : "text-red-600";
 
+  const studentName = result.student_name?.text || "";
+  const studentSurname = result.student_surname?.text || "";
+  const studentNo = result.student_number?.text || result.student_id || "";
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
       <div className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-slate-500">Student ID</p>
-            <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">
-              {result.student_id || "Not detected"}
-            </p>
+            {(studentName || studentSurname) ? (
+              <>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">
+                  {studentName} {studentSurname}
+                </p>
+                <p className="text-sm text-slate-500 font-mono">{studentNo}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500">Öğrenci No</p>
+                <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">
+                  {studentNo || "Tespit edilemedi"}
+                </p>
+              </>
+            )}
           </div>
           {result.score != null && (
             <div className="text-right">
-              <p className="text-sm text-slate-500">Score</p>
+              <p className="text-sm text-slate-500">Puan</p>
               <p className={cn("text-3xl font-bold", scoreColor)}>
                 {result.score.toFixed(0)}
               </p>
@@ -435,19 +631,27 @@ function ResultCard({ result, answerKey }) {
           )}
         </div>
 
+        {/* Review badge */}
+        {result.needs_review && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Doğrulama gerekiyor — Doğrula sekmesinden kontrol edin
+          </div>
+        )}
+
         {/* Warnings */}
-        {(result.unmarked.length > 0 || result.multiple_marks.length > 0) && (
-          <div className="mt-3 space-y-1">
-            {result.unmarked.length > 0 && (
+        {(result.unmarked?.length > 0 || result.multiple_marks?.length > 0) && (
+          <div className="mt-2 space-y-1">
+            {result.unmarked?.length > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-amber-600">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Unmarked: {result.unmarked.join(", ")}
+                Boş: {result.unmarked.join(", ")}
               </div>
             )}
-            {result.multiple_marks.length > 0 && (
+            {result.multiple_marks?.length > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-red-500">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Multiple marks: {result.multiple_marks.join(", ")}
+                Çoklu işaretleme: {result.multiple_marks.join(", ")}
               </div>
             )}
           </div>
@@ -455,13 +659,10 @@ function ResultCard({ result, answerKey }) {
 
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-slate-400">
-            Confidence: {(result.confidence * 100).toFixed(0)}%
+            Güven: {(result.confidence * 100).toFixed(0)}%
           </span>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-xs text-blue-500 hover:underline"
-          >
-            {expanded ? "Hide" : "Show"} answers
+          <button onClick={() => setExpanded(!expanded)} className="text-xs text-blue-500 hover:underline">
+            {expanded ? "Gizle" : "Cevapları göster"}
           </button>
         </div>
       </div>
@@ -474,15 +675,12 @@ function ResultCard({ result, answerKey }) {
               const isCorrect = correct && ans.toUpperCase() === correct.toUpperCase();
               const isEmpty = !ans || ans === "?";
               return (
-                <div
-                  key={q}
-                  className={cn(
-                    "text-center p-1 rounded text-xs font-mono",
-                    isEmpty ? "bg-slate-100 dark:bg-slate-700 text-slate-400" :
-                    isCorrect ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" :
-                    "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                  )}
-                >
+                <div key={q} className={cn(
+                  "text-center p-1 rounded text-xs font-mono",
+                  isEmpty ? "bg-slate-100 text-slate-400" :
+                  isCorrect ? "bg-green-100 text-green-700" :
+                  "bg-red-100 text-red-700"
+                )}>
                   <div className="text-[10px] text-slate-400">{q}</div>
                   <div className="font-bold">{ans || "-"}</div>
                 </div>
@@ -495,10 +693,219 @@ function ResultCard({ result, answerKey }) {
   );
 }
 
-// ==================== RESULTS PAGE ====================
+// ============================================================
+// Review Page (Doğrulama)
+// ============================================================
+
+function ReviewPage({ session, results }) {
+  const [reviews, setReviews] = useState([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [editName, setEditName] = useState("");
+  const [editSurname, setEditSurname] = useState("");
+  const [editNo, setEditNo] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    const pending = results
+      .map((r, i) => ({ ...r, _index: i }))
+      .filter(r => r.needs_review);
+    setReviews(pending);
+    if (pending.length > 0) {
+      const r = pending[0];
+      setEditName(r.student_name?.text || "");
+      setEditSurname(r.student_surname?.text || "");
+      setEditNo(r.student_number?.text || "");
+    }
+  }, [session, results]);
+
+  const loadCurrent = (idx) => {
+    if (idx >= 0 && idx < reviews.length) {
+      setCurrentIdx(idx);
+      const r = reviews[idx];
+      setEditName(r.student_name?.text || "");
+      setEditSurname(r.student_surname?.text || "");
+      setEditNo(r.student_number?.text || "");
+    }
+  };
+
+  const approve = async () => {
+    if (!session || reviews.length === 0) return;
+    setLoading(true);
+    try {
+      await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
+        result_index: reviews[currentIdx]._index,
+        student_name: editName,
+        student_surname: editSurname,
+        student_number: editNo,
+        approved: true,
+      });
+      // Move to next
+      const next = currentIdx + 1;
+      if (next < reviews.length) {
+        loadCurrent(next);
+      } else {
+        setReviews(reviews.filter((_, i) => i !== currentIdx));
+        setCurrentIdx(0);
+      }
+    } catch (e) {
+      alert("Hata: " + (e.response?.data?.detail || e.message));
+    }
+    setLoading(false);
+  };
+
+  if (!session) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 text-center text-slate-500 mt-20">
+        <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p>Önce sınav oluşturun</p>
+      </div>
+    );
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 text-center text-slate-500 mt-20">
+        <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-400" />
+        <p className="font-medium">Doğrulama bekleyen form yok</p>
+        <p className="text-xs mt-1">Tüm formlar otomatik okundu veya henüz tarama yapılmadı</p>
+      </div>
+    );
+  }
+
+  const current = reviews[currentIdx];
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      {/* Progress */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Doğrulama: {currentIdx + 1} / {reviews.length}
+        </span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => loadCurrent(currentIdx - 1)}
+            disabled={currentIdx === 0}
+            className="px-3 py-1 text-sm bg-slate-100 rounded-lg disabled:opacity-30"
+          >
+            ← Önceki
+          </button>
+          <button
+            onClick={() => loadCurrent(currentIdx + 1)}
+            disabled={currentIdx >= reviews.length - 1}
+            className="px-3 py-1 text-sm bg-slate-100 rounded-lg disabled:opacity-30"
+          >
+            Sonraki →
+          </button>
+        </div>
+      </div>
+
+      {/* Form image */}
+      {current.form_image_base64 && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <img
+            src={`data:image/jpeg;base64,${current.form_image_base64}`}
+            alt="Taranan form"
+            className="w-full"
+          />
+        </div>
+      )}
+
+      {/* Editable fields */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-3">
+        <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Öğrenci Bilgileri</h3>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-600 w-16">Ad:</label>
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value.toUpperCase())}
+            className={cn(
+              "flex-1 px-3 py-2 border rounded-lg text-sm font-mono",
+              current.student_name?.needs_review
+                ? "border-amber-400 bg-amber-50"
+                : "border-slate-200 bg-white"
+            )}
+          />
+          {current.student_name && (
+            <span className="text-xs text-slate-400">
+              %{(current.student_name.confidence * 100).toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-600 w-16">Soyad:</label>
+          <input
+            type="text"
+            value={editSurname}
+            onChange={(e) => setEditSurname(e.target.value.toUpperCase())}
+            className={cn(
+              "flex-1 px-3 py-2 border rounded-lg text-sm font-mono",
+              current.student_surname?.needs_review
+                ? "border-amber-400 bg-amber-50"
+                : "border-slate-200 bg-white"
+            )}
+          />
+          {current.student_surname && (
+            <span className="text-xs text-slate-400">
+              %{(current.student_surname.confidence * 100).toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-600 w-16">No:</label>
+          <input
+            type="text"
+            value={editNo}
+            onChange={(e) => setEditNo(e.target.value)}
+            className={cn(
+              "flex-1 px-3 py-2 border rounded-lg text-sm font-mono",
+              current.student_number?.needs_review
+                ? "border-amber-400 bg-amber-50"
+                : "border-slate-200 bg-white"
+            )}
+          />
+          {current.student_number && (
+            <span className="text-xs text-slate-400">
+              %{(current.student_number.confidence * 100).toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        {/* Score display */}
+        {current.score != null && (
+          <div className="pt-2 border-t border-slate-100">
+            <span className="text-sm text-slate-500">Puan: </span>
+            <span className="font-bold text-lg">{current.score.toFixed(0)}</span>
+            <span className="text-sm text-slate-400 ml-2">
+              ({current.correct_count}/{current.total_questions})
+            </span>
+          </div>
+        )}
+
+        <button
+          onClick={approve}
+          disabled={loading}
+          className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <Check className="w-4 h-4" />
+          {loading ? "Kaydediliyor..." : "Onayla ve devam et"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Results Page
+// ============================================================
 
 function ResultsPage({ session, results }) {
   const [stats, setStats] = useState(null);
+  const [roster, setRoster] = useState(null);
 
   const successResults = results.filter((r) => r.success && r.score != null);
 
@@ -506,6 +913,9 @@ function ResultsPage({ session, results }) {
     if (session?.session_id && successResults.length > 0) {
       axios.get(`${API}/api/sessions/${session.session_id}/stats`)
         .then((res) => setStats(res.data))
+        .catch(() => {});
+      axios.get(`${API}/api/sessions/${session.session_id}/roster`)
+        .then((res) => setRoster(res.data))
         .catch(() => {});
     }
   }, [session, successResults.length]);
@@ -520,42 +930,89 @@ function ResultsPage({ session, results }) {
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `results_${session.session_id}.csv`;
+      a.download = `sonuclar_${session.session_id}.csv`;
       a.click();
     } catch (e) {
-      alert("Export error");
+      alert("Dışa aktarma hatası");
     }
   };
 
   if (!session) {
     return (
-      <div className="max-w-2xl mx-auto p-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl mx-auto p-4 text-center text-slate-500 mt-20">
         <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p>No results yet</p>
+        <p>Henüz sonuç yok</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
-      {/* Stats overview */}
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      {/* Stats */}
       {stats && stats.total_students > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard icon={Users} label="Students" value={stats.total_students} />
-          <StatCard icon={Target} label="Average" value={`${stats.average_score.toFixed(1)}`} />
-          <StatCard icon={Trophy} label="Highest" value={`${stats.highest_score.toFixed(0)}`} color="text-green-600" />
-          <StatCard icon={AlertTriangle} label="Lowest" value={`${stats.lowest_score.toFixed(0)}`} color="text-red-600" />
+          <StatCard icon={Users} label="Öğrenci" value={stats.total_students} />
+          <StatCard icon={Target} label="Ortalama" value={`${stats.average_score.toFixed(1)}`} />
+          <StatCard icon={Trophy} label="En yüksek" value={`${stats.highest_score.toFixed(0)}`} color="text-green-600" />
+          <StatCard icon={AlertTriangle} label="En düşük" value={`${stats.lowest_score.toFixed(0)}`} color="text-red-600" />
         </div>
       )}
 
-      {/* Export button */}
+      {/* Class Roster with scores */}
+      {roster && roster.students && roster.students.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <h3 className="font-semibold text-slate-900 dark:text-white">Sınıf Listesi — Notlar</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-700">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">#</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ad Soyad</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Puan</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">D/Y</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster.students.map((s, i) => (
+                <tr key={i} className="border-t border-slate-100 dark:border-slate-600">
+                  <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                  <td className="px-3 py-2 text-slate-900 dark:text-white font-medium">
+                    {s.name} {s.surname}
+                  </td>
+                  <td className="px-3 py-2 text-slate-600 font-mono text-xs">{s.student_number}</td>
+                  <td className="px-3 py-2 text-right">
+                    {s.score != null ? (
+                      <span className={cn(
+                        "font-bold",
+                        s.score >= 70 ? "text-green-600" :
+                        s.score >= 50 ? "text-amber-600" : "text-red-600"
+                      )}>
+                        {s.score.toFixed(0)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs text-slate-500">
+                    {s.score != null ? `${s.correct_count}/${s.total_questions}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Export */}
       {successResults.length > 0 && (
         <button
           onClick={exportCSV}
-          className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2 transition-colors"
+          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 flex items-center justify-center gap-2"
         >
           <Download className="w-4 h-4" />
-          Export CSV
+          CSV Dışa Aktar
         </button>
       )}
 
@@ -568,7 +1025,7 @@ function ResultsPage({ session, results }) {
 
       {results.length === 0 && (
         <p className="text-center text-slate-400 text-sm mt-10">
-          Scan answer sheets to see results here
+          Sonuçları görmek için form tarayın
         </p>
       )}
     </div>
@@ -587,7 +1044,9 @@ function StatCard({ icon: Icon, label, value, color = "text-slate-900 dark:text-
   );
 }
 
-// ==================== APP ====================
+// ============================================================
+// App
+// ============================================================
 
 export default function App() {
   const [page, setPage] = useState("setup");
@@ -598,15 +1057,11 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Header page={page} setPage={setPage} session={session} />
       <main className="pb-20">
-        {page === "setup" && (
-          <SetupPage session={session} setSession={setSession} setPage={setPage} />
-        )}
-        {page === "scan" && (
-          <ScanPage session={session} setResults={setResults} results={results} />
-        )}
-        {page === "results" && (
-          <ResultsPage session={session} results={results} />
-        )}
+        {page === "setup" && <SetupPage session={session} setSession={setSession} setPage={setPage} />}
+        {page === "roster" && <RosterPage session={session} setPage={setPage} />}
+        {page === "scan" && <ScanPage session={session} setResults={setResults} results={results} />}
+        {page === "review" && <ReviewPage session={session} results={results} />}
+        {page === "results" && <ResultsPage session={session} results={results} />}
       </main>
     </div>
   );
