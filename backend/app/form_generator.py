@@ -458,10 +458,34 @@ def generate_form_pdf(
     c.setLineWidth(0.5)
     c.line(MARGIN, footer_y + 4 * mm, PAGE_W - MARGIN, footer_y + 4 * mm)
 
+    footer_text = "Made by Sena K\u00f6se"
     c.setFont(FONT_NAME, 6)
     c.setFillColor(ACCENT_DARK)
-    c.drawCentredString(PAGE_W / 2, footer_y,
-                        "Made by Sena K\u00f6se  \u2022  omr-scanner")
+    text_w = c.stringWidth(footer_text, FONT_NAME, 6)
+    text_x = (PAGE_W - text_w) / 2 - 1.5 * mm
+    c.drawString(text_x, footer_y, footer_text)
+
+    # Draw a small heart after the text
+    heart_x = text_x + text_w + 2 * mm
+    heart_y = footer_y + 1.2 * mm
+    hs = 1.2 * mm  # heart half-size
+    p = c.beginPath()
+    p.moveTo(heart_x, heart_y - hs * 0.4)
+    p.curveTo(heart_x, heart_y + hs * 0.8,
+              heart_x + hs * 1.2, heart_y + hs * 0.8,
+              heart_x + hs * 1.2, heart_y)
+    p.curveTo(heart_x + hs * 1.2, heart_y - hs * 0.6,
+              heart_x, heart_y - hs * 1.4,
+              heart_x, heart_y - hs * 1.4)
+    p.curveTo(heart_x, heart_y - hs * 1.4,
+              heart_x - hs * 1.2, heart_y - hs * 0.6,
+              heart_x - hs * 1.2, heart_y)
+    p.curveTo(heart_x - hs * 1.2, heart_y + hs * 0.8,
+              heart_x, heart_y + hs * 0.8,
+              heart_x, heart_y - hs * 0.4)
+    p.close()
+    c.setFillColor(HexColor("#e74c3c"))
+    c.drawPath(p, fill=1, stroke=0)
     c.setFillColor(black)
 
     c.save()
