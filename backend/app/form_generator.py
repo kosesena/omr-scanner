@@ -285,13 +285,6 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
                        col_x + col_width - col_gap, row_y + sp_y - 1 * mm)
                 c.setStrokeColor(black)
 
-            # Alternating row background
-            if row % 2 == 0:
-                c.setFillColor(ROW_ALT)
-                c.rect(col_x + 1 * mm, row_y - 2.2 * mm,
-                       col_width - col_gap - 1 * mm, sp_y,
-                       fill=1, stroke=0)
-
             # Question number
             c.setFont(FONT_NAME_BOLD, q_fs)
             c.setFillColor(DARK)
