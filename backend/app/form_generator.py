@@ -285,6 +285,14 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
                        col_x + col_width - col_gap, row_y + sp_y - 1 * mm)
                 c.setStrokeColor(black)
 
+            # Alternating row background (centered on bubble, no overlap)
+            if row % 2 == 0:
+                c.setFillColor(ROW_ALT)
+                rect_h = sp_y - 1 * mm
+                c.rect(col_x + 1 * mm, row_y - rect_h / 2,
+                       col_width - col_gap - 1 * mm, rect_h,
+                       fill=1, stroke=0)
+
             # Question number
             c.setFont(FONT_NAME_BOLD, q_fs)
             c.setFillColor(DARK)
