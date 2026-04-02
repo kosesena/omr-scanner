@@ -1,10 +1,11 @@
 """
-OMR Optical Form PDF Generator v2
-Clean form with:
+OMR Optical Form PDF Generator v3
+Polished design with:
 - ArUco markers at 4 corners
 - QR code with exam metadata
-- Character boxes for name, surname, student number (handwriting)
-- Answer bubbles grouped in blocks of 5 (Gradescope-style)
+- Character boxes for name, surname, student number
+- Answer bubbles grouped in blocks of 5
+- Turkish character support (DejaVuSans)
 """
 
 import cv2
@@ -15,7 +16,7 @@ import uuid
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
-from reportlab.lib.colors import black, white, HexColor
+from reportlab.lib.colors import black, white, HexColor, Color
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
@@ -30,27 +31,32 @@ ARUCO_DICT = cv2.aruco.DICT_4X4_50
 MARKER_SIZE = 9 * mm
 
 # Colors
-DARK = HexColor("#222222")
-MID = HexColor("#888888")
-LIGHT = HexColor("#CCCCCC")
-VERY_LIGHT = HexColor("#F0F0F0")
-ACCENT = HexColor("#3498DB")
-HEADER_BG = HexColor("#2C3E50")
+DARK = HexColor("#1a1a2e")
+MID = HexColor("#7f8c8d")
+LIGHT = HexColor("#bdc3c7")
+VERY_LIGHT = HexColor("#ecf0f1")
+ACCENT = HexColor("#2980b9")
+ACCENT_DARK = HexColor("#1a5276")
+HEADER_BG = HexColor("#2c3e50")
+BOX_BORDER = HexColor("#95a5a6")
+BUBBLE_BORDER = HexColor("#aab7b8")
+BUBBLE_TEXT = HexColor("#566573")
+ROW_ALT = HexColor("#f8f9fa")
+SEPARATOR = HexColor("#d5dbdb")
 
-# Font setup - try to register a Unicode-capable font
+# Font setup
 _FONT_REGISTERED = False
 FONT_NAME = "Helvetica"
 FONT_NAME_BOLD = "Helvetica-Bold"
 
 
 def _register_fonts():
-    """Register a Unicode-capable TTF font for Turkish character support."""
+    """Register DejaVuSans for Turkish character support."""
     global _FONT_REGISTERED, FONT_NAME, FONT_NAME_BOLD
 
     if _FONT_REGISTERED:
         return
 
-    # Search for DejaVuSans (commonly available on Linux/Docker)
     search_paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -67,7 +73,6 @@ def _register_fonts():
             else:
                 regular = p
 
-    # Try to find via fc-list
     if not regular:
         try:
             result = subprocess.run(
@@ -100,7 +105,7 @@ def _register_fonts():
         elif regular:
             FONT_NAME_BOLD = "DejaVuSans"
     except Exception:
-        pass  # Fall back to Helvetica
+        pass
 
     _FONT_REGISTERED = True
 
@@ -127,7 +132,7 @@ def _draw_aruco(c: canvas.Canvas, x: float, y: float, marker_id: int):
 # ============================================================
 
 def _draw_qr_code(c: canvas.Canvas, x: float, y: float,
-                  data: dict, size: float = 18 * mm):
+                  data: dict, size: float = 20 * mm):
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -144,39 +149,45 @@ def _draw_qr_code(c: canvas.Canvas, x: float, y: float,
 
 
 # ============================================================
-# Character Boxes
+# Character Boxes (polished)
 # ============================================================
 
 def _draw_char_boxes(c: canvas.Canvas, x: float, y: float,
                      label: str, num_boxes: int,
-                     box_size: float = 5.5 * mm,
+                     box_size: float = 5.8 * mm,
                      label_width: float = 28 * mm):
-    c.setFont(FONT_NAME_BOLD, 7)
-    c.setFillColor(DARK)
-    c.drawString(x, y + box_size * 0.3, label)
+    # Label with accent color
+    c.setFont(FONT_NAME_BOLD, 7.5)
+    c.setFillColor(ACCENT_DARK)
+    c.drawString(x, y + box_size * 0.25, label)
 
     bx = x + label_width
     for i in range(num_boxes):
-        c.setStrokeColor(LIGHT)
-        c.setLineWidth(0.6)
+        # Alternating very subtle background
+        if i % 2 == 0:
+            c.setFillColor(HexColor("#f7f9fc"))
+            c.rect(bx + i * box_size, y, box_size, box_size, fill=1, stroke=0)
+
+        c.setStrokeColor(BOX_BORDER)
+        c.setLineWidth(0.5)
         c.rect(bx + i * box_size, y, box_size, box_size, fill=0, stroke=1)
 
     c.setStrokeColor(black)
     c.setFillColor(black)
-    return y - box_size - 2.5 * mm
+    return y - box_size - 3 * mm
 
 
 # ============================================================
-# Answer Bubbles
+# Answer Bubbles (polished)
 # ============================================================
 
 def _draw_bubble(c: canvas.Canvas, x: float, y: float,
-                 label: str, r: float = 2.0 * mm):
-    c.setStrokeColor(LIGHT)
-    c.setLineWidth(0.45)
+                 label: str, r: float = 2.2 * mm):
+    c.setStrokeColor(BUBBLE_BORDER)
+    c.setLineWidth(0.5)
     c.circle(x, y, r, fill=0, stroke=1)
-    c.setFillColor(MID)
-    fs = max(r * 1.7, 3.5)
+    c.setFillColor(BUBBLE_TEXT)
+    fs = max(r * 1.6, 3.8)
     c.setFont(FONT_NAME, fs)
     c.drawCentredString(x, y - fs * 0.35, label)
     c.setFillColor(black)
@@ -190,27 +201,28 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     col_width = available_width / columns
 
     num_options = len(options)
-    q_num_width = 8 * mm
-    col_gap = 2 * mm
+    q_num_width = 9 * mm
+    col_gap = 3 * mm
     usable = col_width - q_num_width - col_gap
     sp_x = usable / num_options
-    bubble_r = min(2.2 * mm, sp_x * 0.4)
+    bubble_r = min(2.3 * mm, sp_x * 0.4)
 
-    sp_y = 5.5 * mm
-    group_gap = 3.0 * mm
+    sp_y = 5.8 * mm
+    group_gap = 3.5 * mm
 
-    # Column headers
-    c.setFont(FONT_NAME_BOLD, 6.5)
-    c.setFillColor(DARK)
+    # Column headers with accent underline
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
+        c.setFont(FONT_NAME_BOLD, 7)
+        c.setFillColor(ACCENT_DARK)
         for opt_idx, opt in enumerate(options):
             ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
-            c.drawCentredString(ox, y_start + 2 * mm, opt)
+            c.drawCentredString(ox, y_start + 2.5 * mm, opt)
     c.setFillColor(black)
 
-    c.setStrokeColor(LIGHT)
-    c.setLineWidth(0.4)
+    # Header line
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(0.8)
     c.line(x_start, y_start - 0.5 * mm,
            x_start + available_width, y_start - 0.5 * mm)
     c.setStrokeColor(black)
@@ -218,7 +230,7 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
         q_start_num = col_idx * questions_per_col
-        row_y = y_start - 4 * mm
+        row_y = y_start - 4.5 * mm
 
         for row in range(questions_per_col):
             q_num = q_start_num + row + 1
@@ -227,22 +239,38 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
 
             if row > 0 and row % 5 == 0:
                 row_y -= group_gap
+                # Group separator line
+                c.setStrokeColor(VERY_LIGHT)
+                c.setLineWidth(0.3)
+                c.line(col_x + 2 * mm, row_y + sp_y - 1 * mm,
+                       col_x + col_width - col_gap, row_y + sp_y - 1 * mm)
+                c.setStrokeColor(black)
 
-            c.setFont(FONT_NAME_BOLD, 6.5)
+            # Alternating row background
+            if row % 2 == 0:
+                c.setFillColor(ROW_ALT)
+                c.rect(col_x + 1 * mm, row_y - 2.2 * mm,
+                       col_width - col_gap - 1 * mm, sp_y,
+                       fill=1, stroke=0)
+
+            # Question number
+            c.setFont(FONT_NAME_BOLD, 7)
             c.setFillColor(DARK)
-            c.drawRightString(col_x + q_num_width - 2 * mm, row_y - 2, str(q_num))
+            c.drawRightString(col_x + q_num_width - 2 * mm, row_y - 1.8, str(q_num))
 
+            # Bubbles
             for opt_idx, opt in enumerate(options):
                 ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
                 _draw_bubble(c, ox, row_y, opt, bubble_r)
 
             row_y -= sp_y
 
+        # Column separator
         if col_idx < columns - 1:
-            sep_x = col_x + col_width - 0.5 * mm
-            c.setStrokeColor(VERY_LIGHT)
-            c.setLineWidth(0.3)
-            c.line(sep_x, y_start, sep_x, row_y + sp_y - 2 * mm)
+            sep_x = col_x + col_width - 1 * mm
+            c.setStrokeColor(SEPARATOR)
+            c.setLineWidth(0.4)
+            c.line(sep_x, y_start + 3 * mm, sep_x, row_y + sp_y - 2 * mm)
             c.setStrokeColor(black)
 
 
@@ -252,7 +280,7 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
 
 def generate_form_pdf(
     num_questions: int = 40,
-    title: str = "SINAV OPTIK FORMU",
+    title: str = "SINAV OPT\u0130K FORMU",
     options: list = None,
     output_path: str = None,
     exam_id: str = None,
@@ -261,7 +289,6 @@ def generate_form_pdf(
     name_boxes: int = 20,
     surname_boxes: int = 20,
     student_no_boxes: int = 9,
-    # Legacy parameters (ignored)
     num_id_digits: int = 10,
 ) -> bytes:
     _register_fonts()
@@ -272,7 +299,6 @@ def generate_form_pdf(
     if exam_id is None:
         exam_id = uuid.uuid4().hex[:8]
 
-    # Max 80 questions
     num_questions = min(num_questions, 80)
 
     buffer = BytesIO()
@@ -286,19 +312,29 @@ def generate_form_pdf(
     _draw_aruco(c, m, m, 2)
     _draw_aruco(c, PAGE_W - m - MARKER_SIZE, m, 3)
 
-    # === Title ===
-    title_y = PAGE_H - m - MARKER_SIZE - 7 * mm
-    c.setFont(FONT_NAME_BOLD, 12)
+    # === Header bar ===
+    header_h = 10 * mm
+    title_y = PAGE_H - m - MARKER_SIZE - 5 * mm
+
+    # Accent line under title
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(1.5)
+    c.line(MARGIN, title_y - 4 * mm, PAGE_W - MARGIN, title_y - 4 * mm)
+
+    # Title text
+    c.setFont(FONT_NAME_BOLD, 13)
     c.setFillColor(HEADER_BG)
     c.drawCentredString(PAGE_W / 2, title_y, title)
-
-    c.setStrokeColor(ACCENT)
-    c.setLineWidth(1.0)
-    c.line(MARGIN, title_y - 3 * mm, PAGE_W - MARGIN, title_y - 3 * mm)
-    c.setStrokeColor(black)
     c.setFillColor(black)
 
-    # === QR Code ===
+    # Course code subtitle if provided
+    if course_code:
+        c.setFont(FONT_NAME, 8)
+        c.setFillColor(ACCENT)
+        c.drawCentredString(PAGE_W / 2, title_y - 10 * mm, f"Ders: {course_code}")
+        c.setFillColor(black)
+
+    # === QR Code (right side) ===
     qr_data = {
         "v": 2,
         "exam_id": exam_id,
@@ -309,23 +345,24 @@ def generate_form_pdf(
     if answer_key_id:
         qr_data["key_id"] = answer_key_id
 
-    qr_size = 18 * mm
+    qr_size = 20 * mm
     qr_x = PAGE_W - MARGIN - qr_size
-    qr_y = title_y - 6 * mm - qr_size
+    qr_y = title_y - 8 * mm - qr_size
     _draw_qr_code(c, qr_x, qr_y, qr_data, qr_size)
 
+    # QR label
     c.setFont(FONT_NAME, 4.5)
     c.setFillColor(MID)
-    c.drawCentredString(qr_x + qr_size / 2, qr_y - 2.5 * mm,
-                        f"Exam: {exam_id}")
+    c.drawCentredString(qr_x + qr_size / 2, qr_y - 3 * mm,
+                        f"S\u0131nav ID: {exam_id}")
     c.setFillColor(black)
 
     # === Character boxes ===
-    box_y = title_y - 10 * mm
-    box_size = 5.2 * mm
-    label_w = 22 * mm
+    box_y = title_y - 14 * mm
+    box_size = 5.5 * mm
+    label_w = 24 * mm
 
-    available_box_width = qr_x - MARGIN - label_w - 5 * mm
+    available_box_width = qr_x - MARGIN - label_w - 8 * mm
     max_boxes = int(available_box_width / box_size)
 
     actual_name_boxes = min(name_boxes, max_boxes)
@@ -339,26 +376,33 @@ def generate_form_pdf(
     box_y = _draw_char_boxes(c, MARGIN, box_y, "NO:", actual_no_boxes,
                              box_size=box_size, label_width=label_w)
 
-    # === Instruction ===
-    inst_y = box_y - 2 * mm
-    c.setFont(FONT_NAME, 5.5)
-    c.setFillColor(MID)
-    c.drawString(MARGIN, inst_y,
-                 "Kutulara BUYUK HARF ile yaziniz. Cevap balonlarini tamamen doldurunuz.")
+    # === Instruction line ===
+    inst_y = box_y - 1.5 * mm
+
+    # Instruction box with light background
+    inst_box_h = 6 * mm
+    c.setFillColor(HexColor("#eaf2f8"))
+    c.roundRect(MARGIN, inst_y - 1.5 * mm, PAGE_W - 2 * MARGIN, inst_box_h,
+                1.5 * mm, fill=1, stroke=0)
 
     c.setFont(FONT_NAME, 5.5)
-    ex_x = PAGE_W - MARGIN - 35 * mm
-    c.drawString(ex_x, inst_y, "Ornek:")
+    c.setFillColor(ACCENT_DARK)
+    c.drawString(MARGIN + 3 * mm, inst_y + 0.5 * mm,
+                 "Kutulara B\u00dcY\u00dcK HARF ile yaz\u0131n\u0131z. "
+                 "Cevap balonlar\u0131n\u0131 tamamen doldurunuz.")
+
+    # Example bubble
+    c.setFont(FONT_NAME, 5.5)
+    ex_x = PAGE_W - MARGIN - 30 * mm
+    c.drawString(ex_x, inst_y + 0.5 * mm, "\u00d6rnek:")
     c.setFillColor(DARK)
-    c.circle(ex_x + 14 * mm, inst_y + 1.5, 2.2 * mm, fill=1, stroke=0)
+    c.circle(ex_x + 14 * mm, inst_y + 1.8 * mm, 2.2 * mm, fill=1, stroke=0)
     c.setFillColor(black)
 
     # === Answer section ===
-    answer_y = inst_y - 7 * mm
+    answer_y = inst_y - 8 * mm
 
-    if num_questions <= 25:
-        cols = 2
-    elif num_questions <= 50:
+    if num_questions <= 50:
         cols = 2
     else:
         cols = 4
@@ -366,10 +410,20 @@ def generate_form_pdf(
     _draw_answer_section(c, MARGIN, answer_y, num_questions, options, cols)
 
     # === Footer ===
-    c.setFont(FONT_NAME, 4.5)
+    footer_y = m + MARKER_SIZE + 2.5 * mm
+
+    # Footer line
+    c.setStrokeColor(ACCENT)
+    c.setLineWidth(0.5)
+    c.line(MARGIN, footer_y + 4 * mm, PAGE_W - MARGIN, footer_y + 4 * mm)
+
+    c.setFont(FONT_NAME, 5)
     c.setFillColor(MID)
-    c.drawCentredString(PAGE_W / 2, m + MARKER_SIZE + 2 * mm,
-                        f"OMR Scanner  |  {num_questions} Soru  |  Katlamayiniz ve kirletmeyiniz.")
+    c.drawString(MARGIN, footer_y,
+                 f"{num_questions} Soru  \u00b7  {len(options)} \u015e\u0131k  \u00b7  "
+                 "Ka\u011f\u0131d\u0131 katlamay\u0131n\u0131z ve kirletmeyiniz.")
+    c.drawRightString(PAGE_W - MARGIN, footer_y,
+                      "Made by Sena K\u00f6se")
     c.setFillColor(black)
 
     c.save()
@@ -382,11 +436,11 @@ def generate_form_pdf(
 
 
 if __name__ == "__main__":
-    for nq in [20, 40, 60, 80]:
+    for nq in [20, 40]:
         print(f"Generating {nq}-question form...")
         generate_form_pdf(
             num_questions=nq,
-            title=f"SINAV OPTIK FORMU - {nq} SORU",
+            title=f"SINAV OPT\u0130K FORMU - {nq} SORU",
             course_code="MAT101",
             output_path=f"sample_form_{nq}q.pdf"
         )
