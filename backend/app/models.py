@@ -7,6 +7,8 @@ from typing import Optional
 class AnswerKeyRequest(BaseModel):
     """Answer key for grading."""
     answers: dict = Field(..., example={"1": "A", "2": "B", "3": "C"})
+    answers_b: Optional[dict] = None  # Booklet B answer key
+    use_booklet: bool = False
     num_questions: int = Field(40, ge=1, le=200)
 
 
@@ -41,6 +43,8 @@ class ScanResponse(BaseModel):
     # QR metadata
     exam_id: Optional[str] = None
     course_code: Optional[str] = None
+    # Booklet
+    booklet: Optional[str] = None  # "A" or "B"
     # Answers
     answers: dict = {}
     score: Optional[float] = None
@@ -76,6 +80,8 @@ class ExamSession(BaseModel):
     """An exam session with answer key, class roster and results."""
     session_id: str
     answer_key: dict
+    answer_key_b: Optional[dict] = None  # Booklet B
+    use_booklet: bool = False
     num_questions: int
     results: list[ScanResponse] = []
     # New fields

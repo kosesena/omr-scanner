@@ -69,13 +69,19 @@ function Header({ page, setPage, session }) {
 function SetupPage({ session, setSession, setPage }) {
   const [numQ, setNumQ] = useState(40);
   const [numOpts, setNumOpts] = useState(5);
-  const [keys, setKeys] = useState({});
+  const [useBooklet, setUseBooklet] = useState(false);
+  const [activeBooklet, setActiveBooklet] = useState("A");
+  const [keysA, setKeysA] = useState({});
+  const [keysB, setKeysB] = useState({});
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [courseCode, setCourseCode] = useState("");
 
   const allOptions = ["A", "B", "C", "D", "E"];
   const options = allOptions.slice(0, numOpts);
+
+  const keys = activeBooklet === "A" ? keysA : keysB;
+  const setKeys = activeBooklet === "A" ? setKeysA : setKeysB;
 
   const setAnswer = (q, ans) => {
     setKeys((prev) => ({ ...prev, [String(q)]: ans }));
@@ -84,13 +90,15 @@ function SetupPage({ session, setSession, setPage }) {
   const changeOpts = (n) => {
     setNumOpts(n);
     const valid = allOptions.slice(0, n);
-    setKeys((prev) => {
+    const cleanFn = (prev) => {
       const cleaned = {};
       for (const [q, v] of Object.entries(prev)) {
         if (valid.includes(v)) cleaned[q] = v;
       }
       return cleaned;
-    });
+    };
+    setKeysA(cleanFn);
+    setKeysB(cleanFn);
   };
 
   const fillRandom = () => {
@@ -102,19 +110,38 @@ function SetupPage({ session, setSession, setPage }) {
   };
 
   const createSession = async () => {
-    const filled = Object.keys(keys).length;
-    if (filled < numQ) {
-      alert(`Tüm ${numQ} cevabı doldurun. Şu an: ${filled}`);
+    const filledA = Object.keys(keysA).length;
+    if (filledA < numQ) {
+      alert(`Kitapçık A: Tüm ${numQ} cevabı doldurun. Şu an: ${filledA}`);
       return;
+    }
+    if (useBooklet) {
+      const filledB = Object.keys(keysB).length;
+      if (filledB < numQ) {
+        alert(`Kitapçık B: Tüm ${numQ} cevabı doldurun. Şu an: ${filledB}`);
+        return;
+      }
     }
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/api/sessions/create`, {
-        answers: keys,
+      const payload = {
+        answers: keysA,
         num_questions: numQ,
         num_options: numOpts,
+      };
+      if (useBooklet) {
+        payload.answers_b = keysB;
+        payload.use_booklet = true;
+      }
+      const res = await axios.post(`${API}/api/sessions/create`, payload);
+      setSession({
+        ...res.data,
+        answer_key: keysA,
+        answer_key_b: useBooklet ? keysB : null,
+        use_booklet: useBooklet,
+        course_code: courseCode,
+        num_options: numOpts,
       });
-      setSession({ ...res.data, answer_key: keys, course_code: courseCode, num_options: numOpts });
       setPage("roster");
     } catch (e) {
       alert("Hata: " + (e.response?.data?.detail || e.message));
@@ -154,7 +181,7 @@ function SetupPage({ session, setSession, setPage }) {
             {[20, 40].map((n) => (
               <button
                 key={n}
-                onClick={() => { setNumQ(n); setKeys({}); }}
+                onClick={() => { setNumQ(n); setKeysA({}); setKeysB({}); }}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
                   numQ === n
@@ -199,6 +226,24 @@ function SetupPage({ session, setSession, setPage }) {
           />
         </div>
 
+        <div className="flex items-center gap-3 mb-3">
+          <label className="text-sm text-slate-600 dark:text-slate-400">Kitapçık A/B:</label>
+          <button
+            onClick={() => { setUseBooklet(!useBooklet); setActiveBooklet("A"); }}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+              useBooklet
+                ? "bg-emerald-500 text-white shadow-md"
+                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+            )}
+          >
+            {useBooklet ? "Açık" : "Kapalı"}
+          </button>
+          {useBooklet && (
+            <span className="text-xs text-slate-400">İki farklı cevap anahtarı gireceksiniz</span>
+          )}
+        </div>
+
         <button
           onClick={downloadForm}
           disabled={formLoading}
@@ -212,7 +257,27 @@ function SetupPage({ session, setSession, setPage }) {
       {/* Answer key */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
+            {useBooklet && (
+              <div className="flex gap-1">
+                {["A", "B"].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setActiveBooklet(b)}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                      activeBooklet === b
+                        ? "bg-blue-500 text-white shadow"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                    )}
+                  >
+                    Kitapçık {b}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline">
             Rastgele doldur (test)
           </button>
@@ -244,7 +309,12 @@ function SetupPage({ session, setSession, setPage }) {
 
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-slate-500">
-            {Object.keys(keys).length}/{numQ} dolduruldu
+            {useBooklet ? `${activeBooklet}: ` : ""}{Object.keys(keys).length}/{numQ} dolduruldu
+            {useBooklet && (
+              <span className="ml-2 text-xs">
+                (A: {Object.keys(keysA).length}, B: {Object.keys(keysB).length})
+              </span>
+            )}
           </span>
           <button
             onClick={createSession}
@@ -717,13 +787,20 @@ function ResultCard({ result, answerKey }) {
           )}
         </div>
 
-        {/* Review badge */}
-        {result.needs_review && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            Doğrulama gerekiyor — Doğrula sekmesinden kontrol edin
-          </div>
-        )}
+        {/* Booklet + Review badges */}
+        <div className="mt-2 flex gap-2 flex-wrap">
+          {result.booklet && (
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg">
+              Kitapçık {result.booklet}
+            </span>
+          )}
+          {result.needs_review && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Doğrulama gerekiyor
+            </div>
+          )}
+        </div>
 
         {/* Warnings */}
         {(result.unmarked?.length > 0 || result.multiple_marks?.length > 0) && (

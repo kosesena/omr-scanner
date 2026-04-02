@@ -409,6 +409,24 @@ def generate_form_pdf(
     box_y = _draw_char_boxes(c, MARGIN, box_y, "NO:", actual_no_boxes,
                              box_size=box_size, label_width=label_w)
 
+    # === Booklet selector (Kitapçık A/B) ===
+    booklet_y = box_y + 1 * mm
+    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 8 * mm
+    c.setFont(FONT_NAME_BOLD, 7)
+    c.setFillColor(ACCENT_DARK)
+    c.drawString(bk_x, booklet_y + box_size * 0.25, "KITAP\u00c7IK:")
+    bk_label_w = c.stringWidth("KITAP\u00c7IK:", FONT_NAME_BOLD, 7) + 3 * mm
+    for i, bk in enumerate(["A", "B"]):
+        bx = bk_x + bk_label_w + i * 10 * mm
+        c.setStrokeColor(BUBBLE_BORDER)
+        c.setLineWidth(0.5)
+        c.circle(bx + 3 * mm, booklet_y + box_size * 0.35, 2.5 * mm, fill=0, stroke=1)
+        c.setFillColor(BUBBLE_TEXT)
+        c.setFont(FONT_NAME_BOLD, 6)
+        c.drawCentredString(bx + 3 * mm, booklet_y + box_size * 0.35 - 2, bk)
+    c.setFillColor(black)
+    c.setStrokeColor(black)
+
     # === Instruction line ===
     inst_y = box_y - 1.5 * mm
 

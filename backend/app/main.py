@@ -129,10 +129,16 @@ def create_session(req: AnswerKeyRequest):
     session = ExamSession(
         session_id=session_id,
         answer_key=req.answers,
+        answer_key_b=req.answers_b,
+        use_booklet=req.use_booklet,
         num_questions=req.num_questions,
     )
     sessions[session_id] = session
-    return {"session_id": session_id, "num_questions": req.num_questions}
+    return {
+        "session_id": session_id,
+        "num_questions": req.num_questions,
+        "use_booklet": req.use_booklet,
+    }
 
 
 @app.get("/api/sessions/{session_id}")
@@ -393,8 +399,45 @@ def _match_student_to_roster(session: ExamSession, scan_result: ScanResponse,
 # Scanning
 # =====================
 
+def _read_booklet_bubble(warped_gray: np.ndarray) -> str:
+    """Read booklet A/B bubble from warped form image."""
+    if warped_gray is None:
+        return "A"
+    h, w = warped_gray.shape[:2]
+
+    # Booklet bubbles are on the NO: row, right side
+    # Approximate position: y ~ 0.155*h, x ~ 0.55*w to 0.70*w
+    by = int(h * 0.155)
+    bh = int(h * 0.022)
+
+    # Bubble A region
+    ax1, ax2 = int(w * 0.56), int(w * 0.62)
+    # Bubble B region
+    bx1, bx2 = int(w * 0.64), int(w * 0.70)
+
+    region_a = warped_gray[by:by+bh, ax1:ax2]
+    region_b = warped_gray[by:by+bh, bx1:bx2]
+
+    if region_a.size == 0 or region_b.size == 0:
+        return "A"
+
+    # Adaptive threshold and check fill ratio
+    thresh_a = cv2.adaptiveThreshold(region_a, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                      cv2.THRESH_BINARY_INV, 11, 5)
+    thresh_b = cv2.adaptiveThreshold(region_b, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                      cv2.THRESH_BINARY_INV, 11, 5)
+
+    fill_a = np.sum(thresh_a > 0) / max(thresh_a.size, 1)
+    fill_b = np.sum(thresh_b > 0) / max(thresh_b.size, 1)
+
+    if fill_b > fill_a and fill_b > 0.25:
+        return "B"
+    return "A"
+
+
 def _process_scan(image: np.ndarray, answer_key: dict = None,
-                  session_id: str = None, num_questions: int = 40) -> ScanResponse:
+                  session_id: str = None, num_questions: int = 40,
+                  answer_key_b: dict = None, use_booklet: bool = False) -> ScanResponse:
     """Core scan processing pipeline."""
 
     # Step 1: Read QR code from raw image
@@ -409,7 +452,16 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
 
     # Step 2: OMR scan (markers, transform, read answers)
     engine = OMREngine(num_questions=num_questions)
+    # First scan without grading to detect booklet
     omr_result = engine.scan(image, answer_key=answer_key, debug=False)
+
+    # Step 2.5: Detect booklet and re-grade if needed
+    detected_booklet = "A"
+    if use_booklet and engine.last_warped_gray is not None:
+        detected_booklet = _read_booklet_bubble(engine.last_warped_gray)
+        if detected_booklet == "B" and answer_key_b:
+            # Re-grade with booklet B answer key
+            omr_result = engine.scan(image, answer_key=answer_key_b, debug=False)
 
     if not omr_result.success:
         return ScanResponse(
@@ -467,6 +519,7 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
         student_name=student_name_result,
         student_surname=student_surname_result,
         student_number=student_number_result,
+        booklet=detected_booklet if use_booklet else None,
         exam_id=exam_id,
         course_code=course_code,
         answers=omr_result.answers,
@@ -500,16 +553,21 @@ async def scan_sheet(
         raise HTTPException(400, "Invalid image file")
 
     key = None
+    key_b = None
+    use_bk = False
     if session_id and session_id in sessions:
-        key = sessions[session_id].answer_key
-        num_questions = sessions[session_id].num_questions
+        s = sessions[session_id]
+        key = s.answer_key
+        key_b = s.answer_key_b
+        use_bk = s.use_booklet
+        num_questions = s.num_questions
     elif answer_key:
         try:
             key = json.loads(answer_key)
         except json.JSONDecodeError:
             raise HTTPException(400, "Invalid answer_key JSON")
 
-    response = _process_scan(img, key, session_id, num_questions)
+    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk)
 
     if session_id and session_id in sessions:
         session = sessions[session_id]
@@ -544,16 +602,21 @@ async def scan_sheet_base64(
         raise HTTPException(400, "Could not decode image")
 
     key = None
+    key_b = None
+    use_bk = False
     if session_id and session_id in sessions:
-        key = sessions[session_id].answer_key
-        num_questions = sessions[session_id].num_questions
+        s = sessions[session_id]
+        key = s.answer_key
+        key_b = s.answer_key_b
+        use_bk = s.use_booklet
+        num_questions = s.num_questions
     elif answer_key:
         try:
             key = json.loads(answer_key)
         except json.JSONDecodeError:
             raise HTTPException(400, "Invalid answer_key JSON")
 
-    response = _process_scan(img, key, session_id, num_questions)
+    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk)
 
     if session_id and session_id in sessions:
         session = sessions[session_id]
