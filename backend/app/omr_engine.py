@@ -373,11 +373,11 @@ class OMREngine:
                          f"gap={gap:.0f} gap2={gap_to_second:.0f}")
 
             # Decision logic
-            if gap < 20:
+            if gap < 12:
                 # No bubble is significantly darker than others → unmarked
                 unmarked.append(q_num)
                 answers[q_num] = ""
-            elif gap_to_second < 10:
+            elif gap_to_second < 8:
                 # Two bubbles are very close in darkness → multiple marks
                 # But check if both are clearly dark (both filled)
                 if darkest_val < 150 and second_darkest_val < 150:

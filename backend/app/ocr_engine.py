@@ -1,9 +1,7 @@
 """
 OCR Engine for character box reading.
-Reads handwritten characters from boxed regions on OMR forms.
-
-Positions are computed directly from form_generator.py layout parameters,
-ensuring exact alignment with the printed form.
+Uses Tesseract OCR for handwriting recognition.
+Box positions computed from form_generator.py layout.
 """
 
 import cv2
@@ -13,6 +11,13 @@ from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+try:
+    import pytesseract
+    HAS_TESSERACT = True
+except ImportError:
+    HAS_TESSERACT = False
+    logger.warning("pytesseract not installed — OCR will use fallback")
 
 # Form layout constants (must match form_generator.py AND omr_engine.py)
 PAGE_W_PT = 595.28
@@ -38,11 +43,8 @@ MARKERS_RL = {
         MARKER_MARGIN_PT + _marker_half),
 }
 
-REVIEW_THRESHOLD = 0.6
-
 
 def _rl_to_img(x_rl: float, y_rl: float) -> tuple:
-    """Convert ReportLab coordinate to warped image pixel."""
     m = WARP_MARGIN
     x_frac = (x_rl - MARKERS_RL[0][0]) / (MARKERS_RL[1][0] - MARKERS_RL[0][0])
     x_img = m + x_frac * (WARP_W - 2 * m)
@@ -52,12 +54,7 @@ def _rl_to_img(x_rl: float, y_rl: float) -> tuple:
 
 
 def _compute_char_box_positions():
-    """
-    Compute exact pixel positions of character boxes in the warped image,
-    replicating form_generator.py layout.
-
-    Returns dict: {field_name: [(x1, y1, x2, y2), ...]} in warped image pixels
-    """
+    """Compute exact pixel positions of character boxes in warped image."""
     title_y = PAGE_H_PT - MARKER_MARGIN_PT - MARKER_SIZE_PT - 5 * MM
     box_y_start = title_y - 14 * MM
     box_size = 5.5 * MM
@@ -65,8 +62,6 @@ def _compute_char_box_positions():
     row_step = box_size + 3 * MM
 
     fields = {}
-
-    # Three rows: AD, SOYAD, NO
     field_defs = [
         ("name", 0, 20),
         ("surname", 1, 20),
@@ -74,21 +69,18 @@ def _compute_char_box_positions():
     ]
 
     for field_name, row_idx, num_boxes in field_defs:
-        y_rl = box_y_start - row_idx * row_step  # RL y of box bottom-left
+        y_rl = box_y_start - row_idx * row_step
         bx_start = MARGIN_PT + label_w
 
         boxes = []
         for i in range(num_boxes):
-            # Box corners in RL coords
             x_left_rl = bx_start + i * box_size
             x_right_rl = x_left_rl + box_size
             y_bottom_rl = y_rl
             y_top_rl = y_rl + box_size
 
-            # Convert to warped image pixels
-            x1_img, y1_img = _rl_to_img(x_left_rl, y_top_rl)   # top-left in image
-            x2_img, y2_img = _rl_to_img(x_right_rl, y_bottom_rl)  # bottom-right in image
-
+            x1_img, y1_img = _rl_to_img(x_left_rl, y_top_rl)
+            x2_img, y2_img = _rl_to_img(x_right_rl, y_bottom_rl)
             boxes.append((int(x1_img), int(y1_img), int(x2_img), int(y2_img)))
 
         fields[field_name] = boxes
@@ -96,7 +88,17 @@ def _compute_char_box_positions():
     return fields
 
 
-# Pre-compute positions at module load
+def _compute_field_region(field_name: str, boxes: list) -> tuple:
+    """Get the bounding region for an entire field (all boxes combined)."""
+    if not boxes:
+        return (0, 0, 0, 0)
+    x1 = boxes[0][0]
+    y1 = boxes[0][1]
+    x2 = boxes[-1][2]
+    y2 = boxes[0][3]
+    return (x1, y1, x2, y2)
+
+
 CHAR_BOX_POSITIONS = _compute_char_box_positions()
 
 
@@ -117,233 +119,159 @@ class FieldResult:
 
 
 class OCREngine:
-    """Handwriting recognition engine for character boxes."""
+    """Handwriting recognition using Tesseract OCR."""
 
     def __init__(self):
-        self.empty_threshold = 0.08  # higher threshold to ignore box border artifacts
-        self.digit_templates = self._create_digit_templates()
-        self.alpha_templates = self._create_alpha_templates()
+        pass
 
-    def _create_digit_templates(self) -> dict:
-        """Create rendered templates for digits 0-9."""
-        templates = {}
-        for digit in range(10):
-            img = np.zeros((40, 30), dtype=np.uint8)
-            cv2.putText(img, str(digit), (4, 32),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, 255, 2)
-            templates[str(digit)] = img
-        return templates
-
-    def _create_alpha_templates(self) -> dict:
-        """Create rendered templates for A-Z + digits."""
-        templates = {}
-        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        for ch in chars:
-            img = np.zeros((40, 30), dtype=np.uint8)
-            cv2.putText(img, ch, (2, 32),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, 255, 2)
-            templates[ch] = img
-        return templates
-
-    def extract_box_images(self, warped_gray: np.ndarray,
-                           field_name: str) -> list[np.ndarray]:
-        """Extract individual character images using exact computed positions."""
-        h, w = warped_gray.shape[:2]
-
+    def _extract_field_image(self, warped_gray: np.ndarray,
+                              field_name: str) -> Optional[np.ndarray]:
+        """Extract the entire field region as one image for Tesseract."""
         if field_name not in CHAR_BOX_POSITIONS:
-            return []
+            return None
 
-        boxes = []
-        for (x1, y1, x2, y2) in CHAR_BOX_POSITIONS[field_name]:
-            # Clamp to image bounds
+        boxes = CHAR_BOX_POSITIONS[field_name]
+        x1, y1, x2, y2 = _compute_field_region(field_name, boxes)
+
+        h, w = warped_gray.shape[:2]
+        # Add small vertical padding
+        pad = 2
+        y1 = max(0, y1 - pad)
+        y2 = min(h, y2 + pad)
+        x1 = max(0, x1)
+        x2 = min(w, x2)
+
+        if x2 <= x1 or y2 <= y1:
+            return None
+
+        return warped_gray[y1:y2, x1:x2]
+
+    def _preprocess_for_ocr(self, img: np.ndarray) -> np.ndarray:
+        """Preprocess field image for better Tesseract recognition."""
+        if img is None or img.size == 0:
+            return img
+
+        # Upscale for better recognition (Tesseract works better with larger images)
+        scale = max(3, 100 // max(img.shape[0], 1))
+        upscaled = cv2.resize(img, None, fx=scale, fy=scale,
+                               interpolation=cv2.INTER_CUBIC)
+
+        # Binarize: Otsu threshold (works well for handwriting on white background)
+        _, binary = cv2.threshold(upscaled, 0, 255,
+                                   cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Slight denoise
+        binary = cv2.medianBlur(binary, 3)
+
+        return binary
+
+    def _tesseract_read(self, img: np.ndarray, char_type: str) -> tuple:
+        """Run Tesseract OCR on preprocessed image. Returns (text, confidence)."""
+        if not HAS_TESSERACT or img is None or img.size == 0:
+            return ("", 0.0)
+
+        # Tesseract config based on field type
+        if char_type == "numeric":
+            config = "--psm 7 -c tessedit_char_whitelist=0123456789"
+        else:
+            # Turkish uppercase letters + space
+            config = "--psm 7 -c tessedit_char_whitelist=ABCÇDEFGĞHIİJKLMNOÖPQRSŞTUÜVWXYZ "
+
+        try:
+            # Get detailed data
+            data = pytesseract.image_to_data(
+                img, lang="tur" if char_type != "numeric" else "eng",
+                config=config, output_type=pytesseract.Output.DICT
+            )
+
+            # Combine text from all detected words
+            texts = []
+            confidences = []
+            for i, text in enumerate(data["text"]):
+                text = text.strip()
+                if text:
+                    texts.append(text)
+                    conf = int(data["conf"][i])
+                    if conf > 0:
+                        confidences.append(conf / 100.0)
+
+            result_text = " ".join(texts).strip()
+            avg_conf = sum(confidences) / max(len(confidences), 1)
+
+            return (result_text, avg_conf)
+
+        except Exception as e:
+            logger.warning(f"Tesseract error: {e}")
+            return ("", 0.0)
+
+    def _fallback_read(self, warped_gray: np.ndarray,
+                        field_name: str) -> tuple:
+        """Fallback: count non-empty boxes and return placeholder."""
+        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+        h, w = warped_gray.shape[:2]
+        chars = []
+
+        for (x1, y1, x2, y2) in boxes:
             x1c = max(0, min(x1, w - 1))
             x2c = max(0, min(x2, w))
             y1c = max(0, min(y1, h - 1))
             y2c = max(0, min(y2, h))
 
             if x2c <= x1c or y2c <= y1c:
-                boxes.append(np.zeros((20, 20), dtype=np.uint8))
-                continue
+                break
 
             cell = warped_gray[y1c:y2c, x1c:x2c]
-
-            # Remove box borders (inner region ~15% padding)
-            pad_y = max(2, int(cell.shape[0] * 0.15))
-            pad_x = max(2, int(cell.shape[1] * 0.15))
-            if cell.shape[0] > 2 * pad_y and cell.shape[1] > 2 * pad_x:
-                inner = cell[pad_y:-pad_y, pad_x:-pad_x]
+            # Pad to get inner region
+            pad = max(2, int(min(cell.shape) * 0.15))
+            if cell.shape[0] > 2 * pad and cell.shape[1] > 2 * pad:
+                inner = cell[pad:-pad, pad:-pad]
             else:
                 inner = cell
 
-            boxes.append(inner)
+            # Check if empty
+            mean_val = float(np.mean(inner))
+            dark_ratio = float(np.sum(inner < 120)) / max(inner.size, 1)
 
-        return boxes
-
-    def is_empty_box(self, box_img: np.ndarray) -> bool:
-        """
-        Check if a box is empty (no writing).
-        Uses both intensity check and threshold fill ratio.
-        An empty box has high mean intensity (light) and low fill.
-        A written box has significant dark regions.
-        """
-        if box_img.size == 0:
-            return True
-
-        # Method 1: Mean intensity — empty boxes are bright (>180)
-        mean_val = float(np.mean(box_img))
-        if mean_val > 190:
-            return True
-
-        # Method 2: Check how many truly dark pixels exist
-        # Handwriting creates pixels < 120, box borders are lighter
-        dark_pixels = np.sum(box_img < 120)
-        dark_ratio = dark_pixels / box_img.size
-        if dark_ratio < 0.04:
-            return True
-
-        # Method 3: Adaptive threshold fill ratio
-        binary = cv2.adaptiveThreshold(
-            box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 11, 5
-        )
-        fill_ratio = np.sum(binary > 0) / binary.size
-        return fill_ratio < self.empty_threshold
-
-    def recognize_digit(self, box_img: np.ndarray) -> CharacterResult:
-        """Recognize a single digit using template matching."""
-        if box_img.size == 0 or self.is_empty_box(box_img):
-            return CharacterResult("", 0.0)
-
-        binary = cv2.adaptiveThreshold(
-            box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 11, 5
-        )
-        resized = cv2.resize(binary, (30, 40))
-
-        best_match = ""
-        best_score = 0.0
-
-        for digit, template in self.digit_templates.items():
-            result = cv2.matchTemplate(resized, template, cv2.TM_CCOEFF_NORMED)
-            score = float(np.max(result))
-            if score > best_score:
-                best_score = score
-                best_match = digit
-
-        # Contour-based fallback
-        contour_result = self._contour_digit_recognition(binary)
-        if contour_result and contour_result[1] > best_score:
-            best_match, best_score = contour_result
-
-        confidence = max(0.0, min(1.0, (best_score + 0.5) / 1.5))
-        return CharacterResult(best_match, confidence)
-
-    def _contour_digit_recognition(self, binary: np.ndarray) -> Optional[tuple]:
-        """Simple contour-based digit recognition."""
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
-            return None
-
-        cnt = max(contours, key=cv2.contourArea)
-        area = cv2.contourArea(cnt)
-        if area < 20:
-            return None
-
-        x, y, bw, bh = cv2.boundingRect(cnt)
-        aspect = bw / max(bh, 1)
-
-        contours_all, hierarchy = cv2.findContours(
-            binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
-        holes = 0
-        if hierarchy is not None:
-            for i, h_val in enumerate(hierarchy[0]):
-                if h_val[3] >= 0:
-                    holes += 1
-
-        if holes >= 2:
-            return ("8", 0.5)
-        elif holes == 1:
-            if aspect > 0.5:
-                return ("0", 0.4)
+            if mean_val > 190 or dark_ratio < 0.04:
+                # Trailing empty → stop
+                remaining_empty = True
+                for bx in boxes[boxes.index((x1, y1, x2, y2)) + 1:]:
+                    bx1, by1, bx2, by2 = bx
+                    c = warped_gray[max(0, by1):min(h, by2), max(0, bx1):min(w, bx2)]
+                    if float(np.mean(c)) < 190:
+                        remaining_empty = False
+                        break
+                if remaining_empty:
+                    break
+                chars.append(" ")
             else:
-                return ("4", 0.35)
-        elif aspect < 0.35:
-            return ("1", 0.45)
+                chars.append("?")
 
-        return None
-
-    def recognize_character(self, box_img: np.ndarray,
-                            char_type: str = "alpha") -> CharacterResult:
-        """Recognize a character from a box image."""
-        if char_type == "numeric":
-            return self.recognize_digit(box_img)
-
-        if box_img.size == 0 or self.is_empty_box(box_img):
-            return CharacterResult("", 0.0)
-
-        binary = cv2.adaptiveThreshold(
-            box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 11, 5
-        )
-        resized = cv2.resize(binary, (30, 40))
-
-        best_match = ""
-        best_score = 0.0
-
-        for char, template in self.alpha_templates.items():
-            result = cv2.matchTemplate(resized, template, cv2.TM_CCOEFF_NORMED)
-            score = float(np.max(result))
-            if score > best_score:
-                best_score = score
-                best_match = char
-
-        confidence = max(0.0, min(1.0, (best_score + 0.5) / 1.5))
-        return CharacterResult(best_match, confidence)
+        text = "".join(chars).strip()
+        return (text, 0.3)
 
     def read_field(self, warped_gray: np.ndarray,
                    field_name: str) -> FieldResult:
-        """Read an entire field (name, surname, or student_no)."""
-        field_type_map = {
-            "name": "alpha",
-            "surname": "alpha",
-            "student_no": "numeric",
-        }
+        """Read a field using Tesseract OCR with fallback."""
+        char_type = "numeric" if field_name == "student_no" else "alpha"
 
-        char_type = field_type_map.get(field_name, "alpha")
-        boxes = self.extract_box_images(warped_gray, field_name)
+        # Extract and preprocess field image
+        field_img = self._extract_field_image(warped_gray, field_name)
+        processed = self._preprocess_for_ocr(field_img)
 
-        characters = []
-        char_confidences = []
-        text = ""
-        needs_review = False
+        # Try Tesseract
+        text, confidence = self._tesseract_read(processed, char_type)
 
-        for i, box_img in enumerate(boxes):
-            if self.is_empty_box(box_img):
-                # Check if remaining boxes are also empty (trailing)
-                remaining = boxes[i:]
-                all_empty = all(self.is_empty_box(b) for b in remaining)
-                if all_empty:
-                    break
-                # Not trailing - could be a space
-                text += " "
-                char_confidences.append(1.0)
-                continue
+        # If Tesseract failed, use fallback
+        if not text:
+            text, confidence = self._fallback_read(warped_gray, field_name)
 
-            result = self.recognize_character(box_img, char_type)
-            characters.append(result)
-            char_confidences.append(result.confidence)
-            text += result.character
-
-            if result.confidence < REVIEW_THRESHOLD:
-                needs_review = True
-
-        avg_conf = sum(char_confidences) / max(len(char_confidences), 1)
+        needs_review = confidence < 0.7 or not text
 
         return FieldResult(
-            text=text.strip(),
-            characters=characters,
-            avg_confidence=avg_conf,
+            text=text,
+            characters=[],
+            avg_confidence=confidence,
             needs_review=needs_review,
-            char_confidences=char_confidences,
+            char_confidences=[confidence] * max(len(text), 1),
         )
