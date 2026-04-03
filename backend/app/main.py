@@ -648,9 +648,8 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
             char_confidences=number_field.char_confidences,
         )
 
-        needs_review = (student_name_result.needs_review or
-                        student_surname_result.needs_review or
-                        number_field.needs_review)
+        # All scans require teacher verification before roster matching
+        needs_review = True
 
     # Step 4: Encode form image (always save for later review)
     form_image_b64 = None
@@ -721,10 +720,8 @@ async def scan_sheet(
         session = sessions[session_id]
         result_idx = len(session.results)
         session.results.append(response)
-        if response.needs_review:
-            session.pending_review.append(result_idx)
         if response.success:
-            _match_student_to_roster(session, response, result_idx)
+            session.pending_review.append(result_idx)
         save_session(session)
 
     return response
@@ -773,10 +770,8 @@ async def scan_sheet_base64(
         session = sessions[session_id]
         result_idx = len(session.results)
         session.results.append(response)
-        if response.needs_review:
-            session.pending_review.append(result_idx)
         if response.success:
-            _match_student_to_roster(session, response, result_idx)
+            session.pending_review.append(result_idx)
         save_session(session)
 
     return response
