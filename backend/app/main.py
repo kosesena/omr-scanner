@@ -418,45 +418,10 @@ def _match_student_to_roster(session: ExamSession, scan_result: ScanResponse,
 # Scanning
 # =====================
 
-def _read_booklet_bubble(warped_gray: np.ndarray) -> str:
-    """Read booklet A/B bubble from warped form image."""
-    if warped_gray is None:
-        return "A"
-    h, w = warped_gray.shape[:2]
-
-    # Booklet bubbles are on the NO: row, right side
-    # Approximate position: y ~ 0.155*h, x ~ 0.60*w to 0.76*w
-    by = int(h * 0.155)
-    bh = int(h * 0.022)
-
-    # Bubble A region
-    ax1, ax2 = int(w * 0.60), int(w * 0.67)
-    # Bubble B region
-    bx1, bx2 = int(w * 0.69), int(w * 0.76)
-
-    region_a = warped_gray[by:by+bh, ax1:ax2]
-    region_b = warped_gray[by:by+bh, bx1:bx2]
-
-    if region_a.size == 0 or region_b.size == 0:
-        return "A"
-
-    # Adaptive threshold and check fill ratio
-    thresh_a = cv2.adaptiveThreshold(region_a, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                      cv2.THRESH_BINARY_INV, 11, 5)
-    thresh_b = cv2.adaptiveThreshold(region_b, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                      cv2.THRESH_BINARY_INV, 11, 5)
-
-    fill_a = np.sum(thresh_a > 0) / max(thresh_a.size, 1)
-    fill_b = np.sum(thresh_b > 0) / max(thresh_b.size, 1)
-
-    if fill_b > fill_a and fill_b > 0.25:
-        return "B"
-    return "A"
-
-
 def _process_scan(image: np.ndarray, answer_key: dict = None,
                   session_id: str = None, num_questions: int = 40,
-                  answer_key_b: dict = None, use_booklet: bool = False) -> ScanResponse:
+                  answer_key_b: dict = None, use_booklet: bool = False,
+                  num_options: int = 5) -> ScanResponse:
     """Core scan processing pipeline."""
 
     # Step 1: Read QR code from raw image
@@ -470,14 +435,14 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
             num_questions = qr_data["q"]
 
     # Step 2: OMR scan (markers, transform, read answers)
-    engine = OMREngine(num_questions=num_questions)
+    engine = OMREngine(num_questions=num_questions, num_options=num_options)
     # First scan without grading to detect booklet
     omr_result = engine.scan(image, answer_key=answer_key, debug=False)
 
     # Step 2.5: Detect booklet and re-grade if needed
     detected_booklet = "A"
     if use_booklet and engine.last_warped_gray is not None:
-        detected_booklet = _read_booklet_bubble(engine.last_warped_gray)
+        detected_booklet = engine.read_booklet(engine.last_warped_gray)
         if detected_booklet == "B" and answer_key_b:
             # Re-grade with booklet B answer key
             omr_result = engine.scan(image, answer_key=answer_key_b, debug=False)
@@ -574,19 +539,21 @@ async def scan_sheet(
     key = None
     key_b = None
     use_bk = False
+    num_opts = 5
     if session_id and session_id in sessions:
         s = sessions[session_id]
         key = s.answer_key
         key_b = s.answer_key_b
         use_bk = s.use_booklet
         num_questions = s.num_questions
+        num_opts = s.num_options
     elif answer_key:
         try:
             key = json.loads(answer_key)
         except json.JSONDecodeError:
             raise HTTPException(400, "Invalid answer_key JSON")
 
-    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk)
+    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk, num_opts)
 
     if session_id and session_id in sessions:
         session = sessions[session_id]
@@ -624,19 +591,21 @@ async def scan_sheet_base64(
     key = None
     key_b = None
     use_bk = False
+    num_opts = 5
     if session_id and session_id in sessions:
         s = sessions[session_id]
         key = s.answer_key
         key_b = s.answer_key_b
         use_bk = s.use_booklet
         num_questions = s.num_questions
+        num_opts = s.num_options
     elif answer_key:
         try:
             key = json.loads(answer_key)
         except json.JSONDecodeError:
             raise HTTPException(400, "Invalid answer_key JSON")
 
-    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk)
+    response = _process_scan(img, key, session_id, num_questions, key_b, use_bk, num_opts)
 
     if session_id and session_id in sessions:
         session = sessions[session_id]
