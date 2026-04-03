@@ -249,16 +249,6 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
     header_fs = min(8.5, max(7, sp_y / mm * 0.75))
     q_fs = min(8.5, max(7, sp_y / mm * 0.7))
 
-    # Column headers
-    for col_idx in range(columns):
-        col_x = x_start + col_idx * col_width
-        c.setFont(FONT_NAME_BOLD, header_fs)
-        c.setFillColor(ACCENT_DARK)
-        for opt_idx, opt in enumerate(options):
-            ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
-            c.drawCentredString(ox, y_start + 3 * mm, opt)
-    c.setFillColor(black)
-
     for col_idx in range(columns):
         col_x = x_start + col_idx * col_width
         q_start_num = col_idx * questions_per_col
@@ -282,7 +272,14 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
             if row % 2 == 0:
                 c.setFillColor(ROW_ALT)
                 rect_h = sp_y - 1 * mm
-                c.rect(col_x + 1 * mm, row_y - rect_h / 2,
+                rect_bottom = row_y - rect_h / 2
+                rect_top = row_y + rect_h / 2
+                # Clamp top so it doesn't cover column headers
+                header_limit = y_start
+                if rect_top > header_limit:
+                    rect_top = header_limit
+                    rect_h = rect_top - rect_bottom
+                c.rect(col_x + 1 * mm, rect_bottom,
                        col_width - col_gap - 1 * mm, rect_h,
                        fill=1, stroke=0)
 
@@ -306,6 +303,16 @@ def _draw_answer_section(c: canvas.Canvas, x_start: float, y_start: float,
             c.line(sep_x, y_start + 3 * mm, sep_x, row_y + sp_y - 2 * mm)
             c.setStrokeColor(black)
 
+    # Column headers — drawn AFTER row backgrounds so they are never covered
+    for col_idx in range(columns):
+        col_x = x_start + col_idx * col_width
+        c.setFont(FONT_NAME_BOLD, header_fs)
+        c.setFillColor(ACCENT_DARK)
+        for opt_idx, opt in enumerate(options):
+            ox = col_x + q_num_width + opt_idx * sp_x + sp_x / 2
+            c.drawCentredString(ox, y_start + 3 * mm, opt)
+    c.setFillColor(black)
+
 
 # ============================================================
 # Main Generator
@@ -323,6 +330,7 @@ def generate_form_pdf(
     surname_boxes: int = 20,
     student_no_boxes: int = 9,
     num_id_digits: int = 10,
+    show_booklet: bool = True,
 ) -> bytes:
     _register_fonts()
 
@@ -412,21 +420,22 @@ def generate_form_pdf(
                              box_size=box_size, label_width=label_w)
 
     # === Booklet selector (Kitapçık A/B) — same line as NO ===
-    bk_x = MARGIN + label_w + actual_no_boxes * box_size + 25 * mm
-    c.setFont(FONT_NAME_BOLD, 6.5)
-    c.setFillColor(ACCENT_DARK)
-    c.drawString(bk_x, no_row_y + box_size * 0.25, "K\u0130TAP\u00c7IK:")
-    bk_label_w = c.stringWidth("K\u0130TAP\u00c7IK:", FONT_NAME_BOLD, 6.5) + 9 * mm
-    for i, bk in enumerate(["A", "B"]):
-        bx = bk_x + bk_label_w + i * 8 * mm
-        c.setStrokeColor(BUBBLE_BORDER)
-        c.setLineWidth(0.5)
-        c.circle(bx, no_row_y + box_size * 0.4, 2.3 * mm, fill=0, stroke=1)
-        c.setFillColor(BUBBLE_TEXT)
-        c.setFont(FONT_NAME_BOLD, 5.5)
-        c.drawCentredString(bx, no_row_y + box_size * 0.4 - 1.8, bk)
-    c.setFillColor(black)
-    c.setStrokeColor(black)
+    if show_booklet:
+        bk_x = MARGIN + label_w + actual_no_boxes * box_size + 25 * mm
+        c.setFont(FONT_NAME_BOLD, 6.5)
+        c.setFillColor(ACCENT_DARK)
+        c.drawString(bk_x, no_row_y + box_size * 0.25, "K\u0130TAP\u00c7IK:")
+        bk_label_w = c.stringWidth("K\u0130TAP\u00c7IK:", FONT_NAME_BOLD, 6.5) + 9 * mm
+        for i, bk in enumerate(["A", "B"]):
+            bx = bk_x + bk_label_w + i * 8 * mm
+            c.setStrokeColor(BUBBLE_BORDER)
+            c.setLineWidth(0.5)
+            c.circle(bx, no_row_y + box_size * 0.4, 2.3 * mm, fill=0, stroke=1)
+            c.setFillColor(BUBBLE_TEXT)
+            c.setFont(FONT_NAME_BOLD, 5.5)
+            c.drawCentredString(bx, no_row_y + box_size * 0.4 - 1.8, bk)
+        c.setFillColor(black)
+        c.setStrokeColor(black)
 
     # === Instruction line ===
     inst_y = box_y - 1.5 * mm

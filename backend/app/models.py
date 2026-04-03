@@ -22,6 +22,7 @@ class FormGenerateRequest(BaseModel):
     name_boxes: int = Field(20, ge=10, le=30)
     surname_boxes: int = Field(20, ge=10, le=30)
     student_no_boxes: int = Field(10, ge=5, le=15)
+    show_booklet: bool = Field(True)
 
 
 class CharFieldResult(BaseModel):

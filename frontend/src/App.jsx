@@ -154,7 +154,7 @@ function SetupPage({ session, setSession, setPage }) {
     try {
       const optLabels = allOptions.slice(0, numOpts);
       const res = await axios.get(`${API}/api/forms/download/${numQ}`, {
-        params: { options: optLabels.join(",") },
+        params: { options: optLabels.join(","), show_booklet: useBooklet },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);

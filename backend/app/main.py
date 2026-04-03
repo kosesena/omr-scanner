@@ -88,6 +88,7 @@ def generate_form(req: FormGenerateRequest):
             name_boxes=req.name_boxes,
             surname_boxes=req.surname_boxes,
             student_no_boxes=req.student_no_boxes,
+            show_booklet=req.show_booklet,
         )
 
         return FileResponse(filepath, media_type="application/pdf", filename=filename)
@@ -96,7 +97,8 @@ def generate_form(req: FormGenerateRequest):
 
 
 @app.get("/api/forms/download/{num_questions}")
-def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E"):
+def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E",
+                          show_booklet: bool = True):
     """Download a default form."""
     if num_questions not in [20, 40]:
         raise HTTPException(400, "Supported: 20, 40 questions")
@@ -106,13 +108,15 @@ def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E"):
         opt_list = ["A", "B", "C", "D", "E"]
 
     num_opts = len(opt_list)
-    filepath = os.path.join(FORMS_DIR, f"default_v4_{num_questions}q_{num_opts}opt.pdf")
+    bk_suffix = "_nobk" if not show_booklet else ""
+    filepath = os.path.join(FORMS_DIR, f"default_v4_{num_questions}q_{num_opts}opt{bk_suffix}.pdf")
     # Always regenerate to pick up latest design changes
     generate_form_pdf(
         num_questions=num_questions,
         title=f"SINAV OPT\u0130K FORMU - {num_questions} SORU",
         options=opt_list,
         output_path=filepath,
+        show_booklet=show_booklet,
     )
     return FileResponse(filepath, media_type="application/pdf",
                         filename=f"optik_form_{num_questions}q.pdf")
