@@ -483,8 +483,11 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
 
     # Step 3: OCR - read character boxes
     ocr = OCREngine()
-    # Use raw (non-CLAHE) grayscale for OCR — CLAHE amplifies paper texture noise
-    warped = engine.last_warped_gray_raw if engine.last_warped_gray_raw is not None else engine.last_warped_gray
+    # Use shadow-normalized grayscale for OCR (not raw, not CLAHE)
+    # Normalized removes shadow gradients while preserving ink contrast
+    warped = engine.last_warped_normalized if engine.last_warped_normalized is not None else engine.last_warped_gray_raw
+    if warped is None:
+        warped = engine.last_warped_gray
 
     # Pass roster to OCR engine for name/surname matching
     logger.info(f"OCR: session_id={session_id}, in_sessions={session_id in sessions if session_id else False}")
