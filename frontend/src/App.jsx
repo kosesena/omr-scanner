@@ -1686,7 +1686,7 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
     <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* Stats */}
       {stats && stats.total_students > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <StatCard icon={Users} label="Öğrenci" value={stats.total_students} />
           <StatCard icon={Target} label="Ortalama" value={`${stats.average_score.toFixed(1)}`} />
           <StatCard icon={Trophy} label="En yüksek" value={`${stats.highest_score.toFixed(0)}`} color="text-green-600" />
@@ -1700,29 +1700,53 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <h3 className="font-semibold text-slate-900 dark:text-white">Sınıf Listesi — Notlar</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[500px]">
+          <div className="divide-y divide-slate-100 dark:divide-slate-700 sm:hidden">
+            {roster.students.map((s, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2.5">
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                    {s.name} {s.surname}
+                  </p>
+                  <p className="text-[10px] font-mono text-slate-400">{s.student_number}</p>
+                </div>
+                {s.score != null ? (
+                  <div className="text-right shrink-0">
+                    <span className={cn(
+                      "text-lg font-bold",
+                      s.score >= 70 ? "text-green-600" :
+                      s.score >= 50 ? "text-amber-600" : "text-red-600"
+                    )}>
+                      {s.score.toFixed(0)}
+                    </span>
+                    <p className="text-[10px] text-slate-400">{s.correct_count}/{s.total_questions}</p>
+                  </div>
+                ) : (
+                  <span className="text-slate-300 text-lg">—</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
-                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500 w-8">#</th>
-                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500">Ad Soyad</th>
-                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
-                  <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-slate-500 w-16">Puan</th>
-                  <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-slate-500 w-14">D/Y</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-8">#</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ad Soyad</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-16">Puan</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-14">D/Y</th>
                 </tr>
               </thead>
               <tbody>
                 {roster.students.map((s, i) => (
                   <tr key={i} className="border-t border-slate-100 dark:border-slate-600">
-                    <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs">{i + 1}</td>
-                    <td className="px-2 sm:px-3 py-2 text-slate-900 dark:text-white font-medium text-xs sm:text-sm">
-                      {s.name} {s.surname}
-                    </td>
-                    <td className="px-2 sm:px-3 py-2 text-slate-600 font-mono text-[10px] sm:text-xs">{s.student_number}</td>
-                    <td className="px-2 sm:px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-slate-400 text-xs">{i + 1}</td>
+                    <td className="px-3 py-2 text-slate-900 dark:text-white font-medium">{s.name} {s.surname}</td>
+                    <td className="px-3 py-2 text-slate-600 font-mono text-xs">{s.student_number}</td>
+                    <td className="px-3 py-2 text-right">
                       {s.score != null ? (
                         <span className={cn(
-                          "font-bold text-sm",
+                          "font-bold",
                           s.score >= 70 ? "text-green-600" :
                           s.score >= 50 ? "text-amber-600" : "text-red-600"
                         )}>
@@ -1732,7 +1756,7 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-right text-[10px] sm:text-xs text-slate-500">
+                    <td className="px-3 py-2 text-right text-xs text-slate-500">
                       {s.score != null ? `${s.correct_count}/${s.total_questions}` : ""}
                     </td>
                   </tr>
@@ -1790,12 +1814,12 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
 
 function StatCard({ icon: Icon, label, value, color = "text-slate-900 dark:text-white" }) {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-3 shadow-sm border border-slate-200 dark:border-slate-700">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="w-4 h-4 text-slate-400" />
-        <span className="text-xs text-slate-500">{label}</span>
+    <div className="bg-white dark:bg-slate-800 rounded-xl p-3 sm:p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+        <span className="text-[10px] sm:text-xs text-slate-500">{label}</span>
       </div>
-      <span className={cn("text-2xl font-bold", color)}>{value}</span>
+      <span className={cn("text-xl sm:text-2xl font-bold", color)}>{value}</span>
     </div>
   );
 }
