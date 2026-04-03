@@ -474,9 +474,13 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
     warped = engine.last_warped_gray_raw if engine.last_warped_gray_raw is not None else engine.last_warped_gray
 
     # Pass roster to OCR engine for name/surname matching
+    logger.info(f"OCR: session_id={session_id}, in_sessions={session_id in sessions if session_id else False}")
     if session_id and session_id in sessions:
         sess = sessions[session_id]
-        if sess.roster and sess.roster.students:
+        has_roster = bool(sess.roster and sess.roster.students)
+        logger.info(f"OCR: session found, has_roster={has_roster}, "
+                     f"student_count={len(sess.roster.students) if has_roster else 0}")
+        if has_roster:
             ocr.set_roster([
                 {"name": s.name, "surname": s.surname,
                  "student_number": s.student_number}
