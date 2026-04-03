@@ -269,68 +269,69 @@ class OCREngine:
 
         return padded
 
+    def _ocr_single_digit(self, processed: np.ndarray, config: str) -> tuple:
+        """Run Tesseract on a preprocessed digit image. Returns (digit, confidence)."""
+        try:
+            text = pytesseract.image_to_string(processed, lang="eng", config=config).strip()
+            if text and text[0].isdigit():
+                data = pytesseract.image_to_data(
+                    processed, lang="eng", config=config,
+                    output_type=pytesseract.Output.DICT
+                )
+                conf = 0.0
+                for i, t in enumerate(data["text"]):
+                    if t.strip():
+                        c = int(data["conf"][i])
+                        if c > conf:
+                            conf = c
+                return (text[0], conf / 100.0)
+        except Exception:
+            pass
+        return ("?", 0.0)
+
     def _read_digit(self, cell: np.ndarray) -> tuple:
-        """Read a single digit from a box. Returns (digit_str, confidence).
-        Tries multiple preprocessing strategies for better accuracy."""
+        """Read a single digit using consensus of two preprocessing strategies.
+        If both agree -> high confidence. If they disagree -> return '?' for roster matching."""
         if not HAS_TESSERACT:
             return ("?", 0.0)
 
         config = "--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"
 
-        # Strategy 1: Standard preprocessing
-        processed = self._preprocess_digit(cell)
-        if processed is not None:
-            try:
-                text = pytesseract.image_to_string(
-                    processed, lang="eng", config=config
-                ).strip()
+        # Strategy A: Adaptive threshold (good for uneven lighting)
+        digit_a, conf_a = "?", 0.0
+        processed_a = self._preprocess_digit(cell)
+        if processed_a is not None:
+            digit_a, conf_a = self._ocr_single_digit(processed_a, config)
 
-                if text and text[0].isdigit():
-                    data = pytesseract.image_to_data(
-                        processed, lang="eng", config=config,
-                        output_type=pytesseract.Output.DICT
-                    )
-                    conf = 0.0
-                    for i, t in enumerate(data["text"]):
-                        if t.strip():
-                            c = int(data["conf"][i])
-                            if c > conf:
-                                conf = c
-                    return (text[0], conf / 100.0)
-            except Exception as e:
-                logger.warning(f"Tesseract digit error (strategy 1): {e}")
-
-        # Strategy 2: Higher upscale + Otsu threshold
+        # Strategy B: Otsu threshold + higher upscale (good for clean images)
+        digit_b, conf_b = "?", 0.0
         inner = self._get_inner(cell, margin_frac=0.20)
         if inner is not None and inner.size > 0:
-            try:
-                scale = max(180 / max(inner.shape[0], 1), 4)
-                big = cv2.resize(inner, None, fx=scale, fy=scale,
-                                  interpolation=cv2.INTER_CUBIC)
-                blurred = cv2.GaussianBlur(big, (5, 5), 0)
-                _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                border = 25
-                padded = cv2.copyMakeBorder(binary, border, border, border, border,
-                                             cv2.BORDER_CONSTANT, value=255)
+            scale = max(180 / max(inner.shape[0], 1), 4)
+            big = cv2.resize(inner, None, fx=scale, fy=scale,
+                              interpolation=cv2.INTER_CUBIC)
+            blurred = cv2.GaussianBlur(big, (5, 5), 0)
+            _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            border = 25
+            padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                         cv2.BORDER_CONSTANT, value=255)
+            digit_b, conf_b = self._ocr_single_digit(padded, config)
 
-                text = pytesseract.image_to_string(
-                    padded, lang="eng", config=config
-                ).strip()
+        # Consensus logic
+        if digit_a != "?" and digit_b != "?" and digit_a == digit_b:
+            # Both strategies agree — high confidence
+            return (digit_a, max(conf_a, conf_b))
 
-                if text and text[0].isdigit():
-                    data = pytesseract.image_to_data(
-                        padded, lang="eng", config=config,
-                        output_type=pytesseract.Output.DICT
-                    )
-                    conf = 0.0
-                    for i, t in enumerate(data["text"]):
-                        if t.strip():
-                            c = int(data["conf"][i])
-                            if c > conf:
-                                conf = c
-                    return (text[0], conf / 100.0)
-            except Exception as e:
-                logger.warning(f"Tesseract digit error (strategy 2): {e}")
+        if digit_a != "?" and digit_b != "?" and digit_a != digit_b:
+            # Strategies disagree — uncertain, return '?' so roster matching can fix it
+            logger.info(f"Digit disagreement: A='{digit_a}'({conf_a:.0%}) vs B='{digit_b}'({conf_b:.0%}) -> '?'")
+            return ("?", 0.0)
+
+        # One succeeded, the other didn't
+        if digit_a != "?":
+            return (digit_a, conf_a)
+        if digit_b != "?":
+            return (digit_b, conf_b)
 
         return ("?", 0.0)
 
