@@ -18,3 +18,17 @@ body {
 @media (prefers-color-scheme: dark) {
   body { background: #0f172a; }
 }
+
+/* Hide scrollbar for navigation tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure proper tap highlight on mobile */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
