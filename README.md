@@ -10,7 +10,7 @@ Sinav kagitlarini telefon kamerasiyla tarayan, optik formu okuyan, el yazisi kar
 
 ### Form Olusturma
 - **Optik Form Olusturucu** — A4 PDF formatinda yazdirilabilir sinav formu (ArUco hizalama isaretleri, QR kod, karakter kutulari, balon cevap alanlari)
-- **Esnek Soru Sayisi** — 20, 40, 60, 80 soru destegi
+- **Esnek Soru Sayisi** — 20 ve 40 soru destegi
 - **Secenek Ayari** — A-B-C-D (4 sik) veya A-B-C-D-E (5 sik)
 - **Kitapcik A/B Destegi** — Opsiyonel kitapcik secici, kapaliysa formda gosterilmez
 - **Ders Kodu** — Formun basliginda ve QR kodunda ders kodu bilgisi
@@ -124,7 +124,7 @@ docker run -p 8000:8000 omr-backend
 ### 1. Sinav Olusturma
 
 1. **Ayarlar** sekmesine gidin
-2. Soru sayisini secin (20 / 40 / 60 / 80)
+2. Soru sayisini secin (20 veya 40)
 3. Secenek sayisini belirleyin (A-B-C-D veya A-B-C-D-E)
 4. Ders kodunu girin (ornegin MAT101)
 5. Kitapcik A/B kullanacaksaniz toggle'i acin
@@ -337,7 +337,7 @@ omr-scanner/
 
 | Parametre | Varsayilan | Aciklama |
 |-----------|-----------|----------|
-| `num_questions` | 40 | Soru sayisi (5-80 arasi) |
+| `num_questions` | 40 | Soru sayisi (20 veya 40) |
 | `options` | A,B,C,D,E | Secenek listesi |
 | `show_booklet` | true | Kitapcik secicisini goster/gizle |
 | `name_boxes` | 20 | Ad icin karakter kutusu sayisi |
