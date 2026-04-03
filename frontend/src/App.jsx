@@ -1700,44 +1700,46 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <h3 className="font-semibold text-slate-900 dark:text-white">Sınıf Listesi — Notlar</h3>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-700">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">#</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ad Soyad</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">Puan</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">D/Y</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.students.map((s, i) => (
-                <tr key={i} className="border-t border-slate-100 dark:border-slate-600">
-                  <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                  <td className="px-3 py-2 text-slate-900 dark:text-white font-medium">
-                    {s.name} {s.surname}
-                  </td>
-                  <td className="px-3 py-2 text-slate-600 font-mono text-xs">{s.student_number}</td>
-                  <td className="px-3 py-2 text-right">
-                    {s.score != null ? (
-                      <span className={cn(
-                        "font-bold",
-                        s.score >= 70 ? "text-green-600" :
-                        s.score >= 50 ? "text-amber-600" : "text-red-600"
-                      )}>
-                        {s.score.toFixed(0)}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs text-slate-500">
-                    {s.score != null ? `${s.correct_count}/${s.total_questions}` : ""}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[500px]">
+              <thead className="bg-slate-50 dark:bg-slate-700">
+                <tr>
+                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500 w-8">#</th>
+                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500">Ad Soyad</th>
+                  <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-slate-500">No</th>
+                  <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-slate-500 w-16">Puan</th>
+                  <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-slate-500 w-14">D/Y</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {roster.students.map((s, i) => (
+                  <tr key={i} className="border-t border-slate-100 dark:border-slate-600">
+                    <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs">{i + 1}</td>
+                    <td className="px-2 sm:px-3 py-2 text-slate-900 dark:text-white font-medium text-xs sm:text-sm">
+                      {s.name} {s.surname}
+                    </td>
+                    <td className="px-2 sm:px-3 py-2 text-slate-600 font-mono text-[10px] sm:text-xs">{s.student_number}</td>
+                    <td className="px-2 sm:px-3 py-2 text-right">
+                      {s.score != null ? (
+                        <span className={cn(
+                          "font-bold text-sm",
+                          s.score >= 70 ? "text-green-600" :
+                          s.score >= 50 ? "text-amber-600" : "text-red-600"
+                        )}>
+                          {s.score.toFixed(0)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 sm:px-3 py-2 text-right text-[10px] sm:text-xs text-slate-500">
+                      {s.score != null ? `${s.correct_count}/${s.total_questions}` : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
