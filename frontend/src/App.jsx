@@ -1706,6 +1706,28 @@ export default function App() {
   const [page, setPage] = useState("setup");
   const [session, setSession] = useState(null);
   const [results, setResults] = useState([]);
+  const [backendStatus, setBackendStatus] = useState("checking");
+
+  // Wake up backend on page load
+  useEffect(() => {
+    if (!API) { setBackendStatus("ready"); return; }
+    let cancelled = false;
+    const wake = async () => {
+      for (let i = 0; i < 5; i++) {
+        try {
+          await axios.get(`${API}/health`, { timeout: 50000 });
+          if (!cancelled) setBackendStatus("ready");
+          return;
+        } catch {
+          if (!cancelled) setBackendStatus("waking");
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      }
+      if (!cancelled) setBackendStatus("error");
+    };
+    wake();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleResume = ({ session: s, results: r }) => {
     setSession(s);
@@ -1715,6 +1737,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      {backendStatus === "waking" && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-700">
+          <span className="inline-block animate-spin mr-2">&#9696;</span>
+          Sunucu uyanıyor, lütfen bekleyin...
+        </div>
+      )}
+      {backendStatus === "error" && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-center text-sm text-red-700">
+          Sunucuya bağlanılamadı. Sayfayı yenileyin veya birkaç dakika sonra tekrar deneyin.
+        </div>
+      )}
       <Header page={page} setPage={setPage} session={session} />
       <main className="pb-20">
         {page === "setup" && (

@@ -270,25 +270,135 @@ class OCREngine:
         return padded
 
     def _read_digit(self, cell: np.ndarray) -> tuple:
-        """Read a single digit from a box. Returns (digit_str, confidence)."""
+        """Read a single digit from a box. Returns (digit_str, confidence).
+        Tries multiple preprocessing strategies for better accuracy."""
         if not HAS_TESSERACT:
             return ("?", 0.0)
 
+        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"
+
+        # Strategy 1: Standard preprocessing
         processed = self._preprocess_digit(cell)
+        if processed is not None:
+            try:
+                text = pytesseract.image_to_string(
+                    processed, lang="eng", config=config
+                ).strip()
+
+                if text and text[0].isdigit():
+                    data = pytesseract.image_to_data(
+                        processed, lang="eng", config=config,
+                        output_type=pytesseract.Output.DICT
+                    )
+                    conf = 0.0
+                    for i, t in enumerate(data["text"]):
+                        if t.strip():
+                            c = int(data["conf"][i])
+                            if c > conf:
+                                conf = c
+                    return (text[0], conf / 100.0)
+            except Exception as e:
+                logger.warning(f"Tesseract digit error (strategy 1): {e}")
+
+        # Strategy 2: Higher upscale + Otsu threshold
+        inner = self._get_inner(cell, margin_frac=0.20)
+        if inner is not None and inner.size > 0:
+            try:
+                scale = max(180 / max(inner.shape[0], 1), 4)
+                big = cv2.resize(inner, None, fx=scale, fy=scale,
+                                  interpolation=cv2.INTER_CUBIC)
+                blurred = cv2.GaussianBlur(big, (5, 5), 0)
+                _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                border = 25
+                padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                             cv2.BORDER_CONSTANT, value=255)
+
+                text = pytesseract.image_to_string(
+                    padded, lang="eng", config=config
+                ).strip()
+
+                if text and text[0].isdigit():
+                    data = pytesseract.image_to_data(
+                        padded, lang="eng", config=config,
+                        output_type=pytesseract.Output.DICT
+                    )
+                    conf = 0.0
+                    for i, t in enumerate(data["text"]):
+                        if t.strip():
+                            c = int(data["conf"][i])
+                            if c > conf:
+                                conf = c
+                    return (text[0], conf / 100.0)
+            except Exception as e:
+                logger.warning(f"Tesseract digit error (strategy 2): {e}")
+
+        return ("?", 0.0)
+
+    def _preprocess_letter(self, cell: np.ndarray) -> Optional[np.ndarray]:
+        """Preprocess a letter box for Tesseract (similar to digit but tuned for letters)."""
+        if cell is None or cell.size == 0:
+            return None
+
+        inner = self._get_inner(cell, margin_frac=0.20)
+        if inner is None:
+            return None
+
+        # Upscale to ~120px tall
+        target_h = 120
+        scale = max(target_h / max(inner.shape[0], 1), 3)
+        big = cv2.resize(inner, None, fx=scale, fy=scale,
+                          interpolation=cv2.INTER_CUBIC)
+
+        # Normalize contrast
+        min_v, max_v = float(np.min(big)), float(np.max(big))
+        if max_v - min_v > 20:
+            normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+        else:
+            normalized = big
+
+        # Gaussian blur
+        blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+
+        # Adaptive threshold
+        binary = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 21, 8
+        )
+
+        # Morphological close
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+        # White border
+        border = 20
+        padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                     cv2.BORDER_CONSTANT, value=255)
+        return padded
+
+    def _read_letter(self, cell: np.ndarray) -> tuple:
+        """Read a single letter from a box. Returns (letter_str, confidence)."""
+        if not HAS_TESSERACT:
+            return ("?", 0.0)
+
+        processed = self._preprocess_letter(cell)
         if processed is None:
             return ("?", 0.0)
 
-        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"
+        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVYZabcdefghijklmnoprstuvyz"
         try:
-            # Try image_to_string first (simpler, often works for digits)
             text = pytesseract.image_to_string(
-                processed, lang="eng", config=config
+                processed, lang="tur", config=config
             ).strip()
 
-            if text and text[0].isdigit():
-                # Also get confidence
+            if not text:
+                # Fallback: try with eng
+                text = pytesseract.image_to_string(
+                    processed, lang="eng", config=config
+                ).strip()
+
+            if text and text[0].isalpha():
                 data = pytesseract.image_to_data(
-                    processed, lang="eng", config=config,
+                    processed, lang="tur", config=config,
                     output_type=pytesseract.Output.DICT
                 )
                 conf = 0.0
@@ -297,12 +407,44 @@ class OCREngine:
                         c = int(data["conf"][i])
                         if c > conf:
                             conf = c
-                return (text[0], conf / 100.0)
+                return (text[0].upper(), conf / 100.0)
 
             return ("?", 0.0)
         except Exception as e:
-            logger.warning(f"Tesseract digit error: {e}")
+            logger.warning(f"Tesseract letter error: {e}")
             return ("?", 0.0)
+
+    def _read_name_with_tesseract(self, warped_gray: np.ndarray,
+                                    field_name: str,
+                                    filled_info: list) -> tuple:
+        """Read name/surname field character by character with Tesseract.
+        Returns (text, avg_confidence)."""
+        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+        characters = []
+        confidences = []
+
+        for idx, is_filled, ink_score in filled_info:
+            if not is_filled:
+                # Check if remaining boxes have ink
+                remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
+                if not remaining_filled:
+                    break
+                # Gap = space between words
+                if characters and characters[-1] != " ":
+                    characters.append(" ")
+                    confidences.append(1.0)
+                continue
+
+            cell = self._extract_box(warped_gray, boxes[idx])
+            letter, conf = self._read_letter(cell)
+            characters.append(letter)
+            confidences.append(conf)
+
+        text = "".join(characters).strip()
+        avg_conf = sum(confidences) / max(len(confidences), 1)
+
+        logger.info(f"OCR Tesseract {field_name}: '{text}' (conf={avg_conf:.2f})")
+        return (text, avg_conf)
 
     # ---- Name/Surname recognition via roster matching ----
 
@@ -507,9 +649,9 @@ class OCREngine:
                           filled_info: list, pattern_str: str,
                           char_count: int, word_lengths: list,
                           box_pattern: list) -> FieldResult:
-        """Read name/surname field using box pattern + roster matching."""
+        """Read name/surname field using box pattern + roster matching + Tesseract fallback."""
 
-        # Try roster matching (use student_no hint if available)
+        # Try roster matching first (use student_no hint if available)
         matched_text, match_conf = self._match_roster_name(
             field_name, pattern_str, char_count, word_lengths,
             student_no=self._last_student_no
@@ -519,15 +661,22 @@ class OCREngine:
             text = matched_text
             avg_conf = match_conf
         else:
-            # No roster match — show pattern with char count
-            # e.g., "XXXX XXX" → "[4] [3]" or just the raw pattern
-            if word_lengths:
-                text = " ".join("?" * l for l in word_lengths)
-            elif char_count > 0:
-                text = "?" * char_count
+            # No roster match — try Tesseract character-by-character
+            tess_text, tess_conf = self._read_name_with_tesseract(
+                warped_gray, field_name, filled_info
+            )
+            if tess_text and tess_conf > 0.1:
+                text = tess_text
+                avg_conf = tess_conf
             else:
-                text = ""
-            avg_conf = 0.0
+                # Final fallback — show pattern with ?
+                if word_lengths:
+                    text = " ".join("?" * l for l in word_lengths)
+                elif char_count > 0:
+                    text = "?" * char_count
+                else:
+                    text = ""
+                avg_conf = 0.0
 
         needs_review = avg_conf < 0.7 or not text
 
