@@ -1,6 +1,7 @@
 """
 OCR Engine for character box reading.
 Uses Tesseract OCR for handwriting recognition.
+Each character box is read individually (--psm 10 = single char mode).
 Box positions computed from form_generator.py layout.
 """
 
@@ -88,17 +89,6 @@ def _compute_char_box_positions():
     return fields
 
 
-def _compute_field_region(field_name: str, boxes: list) -> tuple:
-    """Get the bounding region for an entire field (all boxes combined)."""
-    if not boxes:
-        return (0, 0, 0, 0)
-    x1 = boxes[0][0]
-    y1 = boxes[0][1]
-    x2 = boxes[-1][2]
-    y2 = boxes[0][3]
-    return (x1, y1, x2, y2)
-
-
 CHAR_BOX_POSITIONS = _compute_char_box_positions()
 
 
@@ -119,159 +109,170 @@ class FieldResult:
 
 
 class OCREngine:
-    """Handwriting recognition using Tesseract OCR."""
+    """Handwriting recognition — reads each character box individually."""
 
     def __init__(self):
         pass
 
-    def _extract_field_image(self, warped_gray: np.ndarray,
-                              field_name: str) -> Optional[np.ndarray]:
-        """Extract the entire field region as one image for Tesseract."""
-        if field_name not in CHAR_BOX_POSITIONS:
-            return None
-
-        boxes = CHAR_BOX_POSITIONS[field_name]
-        x1, y1, x2, y2 = _compute_field_region(field_name, boxes)
-
+    def _extract_single_box(self, warped_gray: np.ndarray,
+                             box: tuple) -> Optional[np.ndarray]:
+        """Extract a single character box, cropping out borders."""
+        x1, y1, x2, y2 = box
         h, w = warped_gray.shape[:2]
-        # Add small vertical padding
-        pad = 2
-        y1 = max(0, y1 - pad)
-        y2 = min(h, y2 + pad)
+
         x1 = max(0, x1)
+        y1 = max(0, y1)
         x2 = min(w, x2)
+        y2 = min(h, y2)
 
         if x2 <= x1 or y2 <= y1:
             return None
 
-        return warped_gray[y1:y2, x1:x2]
+        cell = warped_gray[y1:y2, x1:x2]
 
-    def _preprocess_for_ocr(self, img: np.ndarray) -> np.ndarray:
-        """Preprocess field image for better Tesseract recognition."""
+        # Crop inner ~70% to remove box border lines
+        ch, cw = cell.shape[:2]
+        pad_x = max(2, int(cw * 0.15))
+        pad_y = max(2, int(ch * 0.15))
+        inner = cell[pad_y:ch - pad_y, pad_x:cw - pad_x]
+
+        if inner.size == 0:
+            return None
+
+        return inner
+
+    def _is_box_empty(self, inner: np.ndarray) -> bool:
+        """Check if a box is empty (no handwriting)."""
+        if inner is None or inner.size == 0:
+            return True
+
+        mean_val = float(np.mean(inner))
+        # Dark pixel ratio (pixels darker than 140)
+        dark_ratio = float(np.sum(inner < 140)) / max(inner.size, 1)
+
+        # Empty box: mostly white, very few dark pixels
+        if mean_val > 180 and dark_ratio < 0.08:
+            return True
+
+        return False
+
+    def _preprocess_single_char(self, img: np.ndarray) -> np.ndarray:
+        """Preprocess a single character box for Tesseract."""
         if img is None or img.size == 0:
             return img
 
-        # Upscale for better recognition (Tesseract works better with larger images)
-        scale = max(3, 100 // max(img.shape[0], 1))
+        # Upscale significantly — Tesseract needs at least ~30px tall characters
+        target_h = 80
+        scale = max(target_h / max(img.shape[0], 1), 2)
         upscaled = cv2.resize(img, None, fx=scale, fy=scale,
                                interpolation=cv2.INTER_CUBIC)
 
-        # Binarize: Otsu threshold (works well for handwriting on white background)
+        # Binarize with Otsu
         _, binary = cv2.threshold(upscaled, 0, 255,
                                    cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Slight denoise
-        binary = cv2.medianBlur(binary, 3)
+        # Add white border (Tesseract needs some padding around chars)
+        border = 15
+        padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                     cv2.BORDER_CONSTANT, value=255)
 
-        return binary
+        return padded
 
-    def _tesseract_read(self, img: np.ndarray, char_type: str) -> tuple:
-        """Run Tesseract OCR on preprocessed image. Returns (text, confidence)."""
+    def _tesseract_single_char(self, img: np.ndarray, char_type: str) -> tuple:
+        """Run Tesseract on a single character. Returns (char, confidence)."""
         if not HAS_TESSERACT or img is None or img.size == 0:
             return ("", 0.0)
 
-        # Tesseract config based on field type
+        # PSM 10 = single character mode
         if char_type == "numeric":
-            config = "--psm 7 -c tessedit_char_whitelist=0123456789"
+            config = "--psm 10 -c tessedit_char_whitelist=0123456789"
         else:
-            # Turkish uppercase letters + space
-            config = "--psm 7 -c tessedit_char_whitelist=ABCÇDEFGĞHIİJKLMNOÖPQRSŞTUÜVWXYZ "
+            config = "--psm 10 -c tessedit_char_whitelist=ABCCDEFGGHIIJKLMNOOPQRSSTUUVWXYZÇĞİÖŞÜ"
 
         try:
-            # Get detailed data
             data = pytesseract.image_to_data(
                 img, lang="tur" if char_type != "numeric" else "eng",
                 config=config, output_type=pytesseract.Output.DICT
             )
 
-            # Combine text from all detected words
-            texts = []
-            confidences = []
+            best_text = ""
+            best_conf = 0.0
+
             for i, text in enumerate(data["text"]):
                 text = text.strip()
                 if text:
-                    texts.append(text)
                     conf = int(data["conf"][i])
-                    if conf > 0:
-                        confidences.append(conf / 100.0)
+                    if conf > best_conf:
+                        best_text = text
+                        best_conf = conf
 
-            result_text = " ".join(texts).strip()
-            avg_conf = sum(confidences) / max(len(confidences), 1)
+            # Normalize: take only first character
+            if best_text:
+                best_text = best_text[0].upper()
 
-            return (result_text, avg_conf)
+            return (best_text, best_conf / 100.0 if best_conf > 0 else 0.0)
 
         except Exception as e:
             logger.warning(f"Tesseract error: {e}")
             return ("", 0.0)
 
-    def _fallback_read(self, warped_gray: np.ndarray,
-                        field_name: str) -> tuple:
-        """Fallback: count non-empty boxes and return placeholder."""
-        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
-        h, w = warped_gray.shape[:2]
-        chars = []
-
-        for (x1, y1, x2, y2) in boxes:
-            x1c = max(0, min(x1, w - 1))
-            x2c = max(0, min(x2, w))
-            y1c = max(0, min(y1, h - 1))
-            y2c = max(0, min(y2, h))
-
-            if x2c <= x1c or y2c <= y1c:
-                break
-
-            cell = warped_gray[y1c:y2c, x1c:x2c]
-            # Pad to get inner region
-            pad = max(2, int(min(cell.shape) * 0.15))
-            if cell.shape[0] > 2 * pad and cell.shape[1] > 2 * pad:
-                inner = cell[pad:-pad, pad:-pad]
-            else:
-                inner = cell
-
-            # Check if empty
-            mean_val = float(np.mean(inner))
-            dark_ratio = float(np.sum(inner < 120)) / max(inner.size, 1)
-
-            if mean_val > 190 or dark_ratio < 0.04:
-                # Trailing empty → stop
-                remaining_empty = True
-                for bx in boxes[boxes.index((x1, y1, x2, y2)) + 1:]:
-                    bx1, by1, bx2, by2 = bx
-                    c = warped_gray[max(0, by1):min(h, by2), max(0, bx1):min(w, bx2)]
-                    if float(np.mean(c)) < 190:
-                        remaining_empty = False
-                        break
-                if remaining_empty:
-                    break
-                chars.append(" ")
-            else:
-                chars.append("?")
-
-        text = "".join(chars).strip()
-        return (text, 0.3)
-
     def read_field(self, warped_gray: np.ndarray,
                    field_name: str) -> FieldResult:
-        """Read a field using Tesseract OCR with fallback."""
+        """Read a field by reading each character box individually."""
         char_type = "numeric" if field_name == "student_no" else "alpha"
+        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
 
-        # Extract and preprocess field image
-        field_img = self._extract_field_image(warped_gray, field_name)
-        processed = self._preprocess_for_ocr(field_img)
+        characters = []
+        confidences = []
+        trailing_empty = 0
 
-        # Try Tesseract
-        text, confidence = self._tesseract_read(processed, char_type)
+        for box in boxes:
+            inner = self._extract_single_box(warped_gray, box)
 
-        # If Tesseract failed, use fallback
-        if not text:
-            text, confidence = self._fallback_read(warped_gray, field_name)
+            if self._is_box_empty(inner):
+                # Check if all remaining boxes are also empty → stop
+                remaining_idx = boxes.index(box)
+                all_remaining_empty = True
+                for rem_box in boxes[remaining_idx + 1:]:
+                    rem_inner = self._extract_single_box(warped_gray, rem_box)
+                    if not self._is_box_empty(rem_inner):
+                        all_remaining_empty = False
+                        break
 
-        needs_review = confidence < 0.7 or not text
+                if all_remaining_empty:
+                    break  # End of text
+
+                # Gap in the middle (e.g., "SENA NUR" has space)
+                characters.append(" ")
+                confidences.append(1.0)
+                continue
+
+            # Non-empty box → OCR
+            processed = self._preprocess_single_char(inner)
+
+            if HAS_TESSERACT:
+                char, conf = self._tesseract_single_char(processed, char_type)
+            else:
+                char, conf = ("?", 0.3)
+
+            if char:
+                characters.append(char)
+                confidences.append(conf)
+            else:
+                characters.append("?")
+                confidences.append(0.0)
+
+        text = "".join(characters).strip()
+        avg_conf = sum(confidences) / max(len(confidences), 1)
+        needs_review = avg_conf < 0.5 or not text or "?" in text
+
+        logger.info(f"OCR {field_name}: '{text}' (conf={avg_conf:.2f}, "
+                     f"chars={len(characters)})")
 
         return FieldResult(
             text=text,
-            characters=[],
-            avg_confidence=confidence,
+            characters=characters,
+            avg_confidence=avg_conf,
             needs_review=needs_review,
-            char_confidences=[confidence] * max(len(text), 1),
+            char_confidences=confidences,
         )
