@@ -28,7 +28,7 @@ function Header({ page, setPage, session }) {
   ];
   return (
     <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
-      <div className="max-w-3xl mx-auto px-3 sm:px-4">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-12 sm:h-14">
           <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Scan className="w-5 h-5 text-blue-500" />
@@ -180,7 +180,7 @@ function SetupPage({ session, setSession, setPage }) {
   const bothFilled = !useBooklet || (Object.keys(keysA).length === numQ && Object.keys(keysB).length === numQ);
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
 
       {/* Active session banner */}
       {session && (
@@ -631,7 +631,7 @@ function RosterPage({ session, setSession, setPage }) {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
         <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>Önce Ayarlar sekmesinden sınav oluşturun</p>
       </div>
@@ -639,7 +639,7 @@ function RosterPage({ session, setSession, setPage }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
         <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Sınıf Listesi</h2>
         <p className="text-xs text-slate-500 mb-4">
@@ -990,7 +990,7 @@ function ScanPage({ session, setSession, setResults, results }) {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
         <Scan className="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>Önce Ayarlar sekmesinden sınav oluşturun</p>
       </div>
@@ -998,7 +998,7 @@ function ScanPage({ session, setSession, setResults, results }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* Camera / Upload toggle */}
       <div className="flex gap-2">
         <button
@@ -1301,7 +1301,7 @@ function ReviewPage({ session, results, setResults }) {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
         <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>Önce sınav oluşturun</p>
       </div>
@@ -1310,7 +1310,7 @@ function ReviewPage({ session, results, setResults }) {
 
   if (reviews.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
         <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-400" />
         <p className="font-medium">Doğrulama bekleyen form yok</p>
         <p className="text-xs mt-1">Tüm formlar otomatik okundu veya henüz tarama yapılmadı</p>
@@ -1321,7 +1321,7 @@ function ReviewPage({ session, results, setResults }) {
   const current = reviews[currentIdx];
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* Progress */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -1466,7 +1466,7 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
 
   if (!session) {
     return (
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
         <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>Henüz sonuç yok</p>
       </div>
@@ -1474,7 +1474,7 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* Stats */}
       {stats && stats.total_students > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1644,7 +1644,7 @@ function SavedSessionsList({ onResume, onNew }) {
   if (savedSessions.length === 0) return null;
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 mt-4 sm:mt-6">
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 sm:p-4">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
           <ClipboardList className="w-4 h-4" />
