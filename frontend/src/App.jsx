@@ -1232,7 +1232,7 @@ function ResultCard({ result, answerKey }) {
 // Review Page (Doğrulama)
 // ============================================================
 
-function ReviewPage({ session, results }) {
+function ReviewPage({ session, results, setResults }) {
   const [reviews, setReviews] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [editName, setEditName] = useState("");
@@ -1268,13 +1268,23 @@ function ReviewPage({ session, results }) {
     if (!session || reviews.length === 0) return;
     setLoading(true);
     try {
+      const resultIdx = reviews[currentIdx]._index;
       await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
-        result_index: reviews[currentIdx]._index,
+        result_index: resultIdx,
         student_name: current.student_name?.text || "",
         student_surname: current.student_surname?.text || "",
         student_number: editNo,
         approved: true,
       });
+      // Update results state with corrected data
+      setResults((prev) => prev.map((r, i) => {
+        if (i !== resultIdx) return r;
+        return {
+          ...r,
+          student_number: { ...r.student_number, text: editNo, needs_review: false },
+          needs_review: false,
+        };
+      }));
       // Move to next
       const next = currentIdx + 1;
       if (next < reviews.length) {
@@ -1545,14 +1555,14 @@ function ResultsPage({ session, results, setResults, setSession, setPage }) {
       {/* Individual results */}
       <div className="space-y-3">
         {results.map((r, i) => (
-          <div key={i} className="relative">
+          <div key={i}>
             <ResultCard result={r} answerKey={session.answer_key} />
             <button
               onClick={() => deleteResult(i)}
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title="Sonucu sil"
+              className="w-full mt-1 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3 h-3" />
+              Sonucu sil
             </button>
           </div>
         ))}
@@ -1747,7 +1757,7 @@ export default function App() {
         )}
         {page === "roster" && <RosterPage session={session} setSession={setSession} setPage={setPage} />}
         {page === "scan" && <ScanPage session={session} setSession={setSession} setResults={setResults} results={results} />}
-        {page === "review" && <ReviewPage session={session} results={results} />}
+        {page === "review" && <ReviewPage session={session} results={results} setResults={setResults} />}
         {page === "results" && <ResultsPage session={session} results={results} setResults={setResults} setSession={setSession} setPage={setPage} />}
       </main>
     </div>
