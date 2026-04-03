@@ -202,8 +202,8 @@ function LoginPage({ onLogin }) {
           </div>
         </div>
 
-        <p className="text-center text-[11px] text-slate-400 mt-6">
-          Crafted with <span className="text-red-400 text-xs">&#10084;&#65039;</span> for teachers by <span className="font-bold text-blue-500">Sena Köse</span>
+        <p className="text-center text-sm text-slate-400 mt-8">
+          Crafted with <span className="text-red-400">&#10084;</span> for teachers by <span className="font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">Sena Köse</span>
         </p>
       </div>
     </div>
