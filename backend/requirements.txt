@@ -10,3 +10,4 @@ qrcode[pil]==7.4.2
 pyzbar==0.1.9
 pdfplumber==0.11.0
 pytesseract==0.3.10
+supabase==2.13.0

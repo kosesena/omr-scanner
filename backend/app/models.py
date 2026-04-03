@@ -60,6 +60,7 @@ class ScanResponse(BaseModel):
     # Review
     needs_review: bool = False
     form_image_base64: Optional[str] = None
+    form_image_url: Optional[str] = None
 
 
 class Student(BaseModel):

@@ -1196,9 +1196,23 @@ function ResultCard({ result, answerKey }) {
           <span className="text-xs text-slate-400">
             Güven: {(result.confidence * 100).toFixed(0)}%
           </span>
-          <button onClick={() => setExpanded(!expanded)} className="text-xs text-blue-500 hover:underline">
-            {expanded ? "Gizle" : "Cevapları göster"}
-          </button>
+          <div className="flex items-center gap-3">
+            {(result.form_image_url || result.form_image_base64) && (
+              <a
+                href={result.form_image_url || `data:image/jpeg;base64,${result.form_image_base64}`}
+                download={`form_${studentNo || "scan"}.jpg`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                Form İndir
+              </a>
+            )}
+            <button onClick={() => setExpanded(!expanded)} className="text-xs text-blue-500 hover:underline">
+              {expanded ? "Gizle" : "Cevapları göster"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1346,13 +1360,25 @@ function ReviewPage({ session, results, setResults }) {
       </div>
 
       {/* Form image */}
-      {current.form_image_base64 && (
+      {(current.form_image_url || current.form_image_base64) && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <img
-            src={`data:image/jpeg;base64,${current.form_image_base64}`}
+            src={current.form_image_url || `data:image/jpeg;base64,${current.form_image_base64}`}
             alt="Taranan form"
             className="w-full"
           />
+          <div className="p-2 border-t border-slate-100">
+            <a
+              href={current.form_image_url || `data:image/jpeg;base64,${current.form_image_base64}`}
+              download={`form_${current.student_number?.text || "scan"}.jpg`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Form Resmini İndir
+            </a>
+          </div>
         </div>
       )}
 

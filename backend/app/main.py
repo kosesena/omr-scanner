@@ -34,7 +34,10 @@ from app.omr_engine import OMREngine
 from app.form_generator import generate_form_pdf
 from app.qr_reader import read_qr_from_image
 from app.ocr_engine import OCREngine
-from app.storage import init_db, save_session, load_all_sessions, delete_session
+from app.storage import (
+    init_db, save_session, load_all_sessions, delete_session,
+    upload_form_image, get_form_image_url, delete_form_image,
+)
 
 app = FastAPI(
     title="OMR Scanner API",
@@ -162,7 +165,14 @@ def create_session(req: AnswerKeyRequest):
 def get_session(session_id: str):
     if session_id not in sessions:
         raise HTTPException(404, "Session not found")
-    return sessions[session_id]
+    s = sessions[session_id]
+    # Populate image URLs for results loaded from DB
+    for i, r in enumerate(s.results):
+        if r.success and not r.form_image_url:
+            url = get_form_image_url(session_id, i)
+            if url:
+                r.form_image_url = url
+    return s
 
 
 @app.get("/api/sessions")
@@ -200,6 +210,7 @@ def delete_result_endpoint(session_id: str, result_index: int):
     if result_index < 0 or result_index >= len(session.results):
         raise HTTPException(404, "Result not found")
     session.results.pop(result_index)
+    delete_form_image(session_id, result_index)
     save_session(session)
     return {"message": "Result deleted"}
 
@@ -719,6 +730,11 @@ async def scan_sheet(
     if session_id and session_id in sessions:
         session = sessions[session_id]
         result_idx = len(session.results)
+        # Upload form image to Supabase Storage
+        if response.form_image_base64:
+            url = upload_form_image(session_id, result_idx, response.form_image_base64)
+            if url:
+                response.form_image_url = url
         session.results.append(response)
         if response.success:
             session.pending_review.append(result_idx)
@@ -769,6 +785,11 @@ async def scan_sheet_base64(
     if session_id and session_id in sessions:
         session = sessions[session_id]
         result_idx = len(session.results)
+        # Upload form image to Supabase Storage
+        if response.form_image_base64:
+            url = upload_form_image(session_id, result_idx, response.form_image_base64)
+            if url:
+                response.form_image_url = url
         session.results.append(response)
         if response.success:
             session.pending_review.append(result_idx)
