@@ -5,7 +5,7 @@ import {
   Camera, FileText, BarChart3, Settings, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, Download, Plus,
   Scan, RotateCcw, Users, Trophy, Target, Upload,
-  ClipboardList, Eye, Edit3, Check, X, UserPlus, Trash2
+  ClipboardList, Eye, Edit3, Check, X, UserPlus, Trash2, Image
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -25,6 +25,7 @@ function Header({ page, setPage, session }) {
     { id: "scan", label: "Tara", icon: Scan },
     { id: "review", label: "Doğrula", icon: Eye },
     { id: "results", label: "Sonuçlar", icon: BarChart3 },
+    { id: "forms", label: "Formlar", icon: Image },
   ];
   return (
     <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
@@ -1434,6 +1435,144 @@ function ReviewPage({ session, results, setResults }) {
 // Results Page
 // ============================================================
 
+// ============================================================
+// Forms Archive Page
+// ============================================================
+
+function FormsPage({ session, results }) {
+  const [selectedForm, setSelectedForm] = useState(null);
+
+  const formsWithImages = results
+    .map((r, i) => ({ ...r, _index: i }))
+    .filter(r => r.success && (r.form_image_url || r.form_image_base64));
+
+  if (!session) {
+    return (
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+        <Image className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p>Önce sınav oluşturun</p>
+      </div>
+    );
+  }
+
+  if (formsWithImages.length === 0) {
+    return (
+      <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 text-center text-slate-500 mt-20">
+        <Image className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p className="font-medium">Henüz taranan form yok</p>
+        <p className="text-xs mt-1">Formları taradıktan sonra burada görünecek</p>
+      </div>
+    );
+  }
+
+  const imgSrc = (r) => r.form_image_url || `data:image/jpeg;base64,${r.form_image_base64}`;
+
+  return (
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+          <Image className="w-5 h-5 text-blue-500" />
+          Taranan Formlar ({formsWithImages.length})
+        </h2>
+      </div>
+
+      {/* Form grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {formsWithImages.map((r) => {
+          const studentNo = r.student_number?.text || r.student_id || "—";
+          return (
+            <div
+              key={r._index}
+              className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setSelectedForm(r)}
+            >
+              <img
+                src={imgSrc(r)}
+                alt={`Form ${studentNo}`}
+                className="w-full aspect-[3/4] object-cover object-top"
+              />
+              <div className="p-2.5">
+                <p className="text-xs font-mono font-bold text-slate-900 dark:text-white truncate">{studentNo}</p>
+                <div className="flex items-center justify-between mt-1">
+                  {r.score != null && (
+                    <span className={cn(
+                      "text-sm font-bold",
+                      r.score >= 70 ? "text-green-600" : r.score >= 50 ? "text-amber-600" : "text-red-600"
+                    )}>
+                      {r.score.toFixed(0)} puan
+                    </span>
+                  )}
+                  <a
+                    href={imgSrc(r)}
+                    download={`form_${studentNo}.jpg`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-blue-500 hover:text-blue-700"
+                    title="İndir"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Full-size modal */}
+      {selectedForm && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedForm(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden max-w-2xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <p className="font-mono font-bold text-slate-900 dark:text-white">
+                  {selectedForm.student_number?.text || selectedForm.student_id || "—"}
+                </p>
+                {selectedForm.score != null && (
+                  <p className="text-sm text-slate-500">{selectedForm.score.toFixed(0)} puan · {selectedForm.correct_count}/{selectedForm.total_questions}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={imgSrc(selectedForm)}
+                  download={`form_${selectedForm.student_number?.text || "scan"}.jpg`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  İndir
+                </a>
+                <button
+                  onClick={() => setSelectedForm(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto">
+              <img
+                src={imgSrc(selectedForm)}
+                alt="Form"
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function ResultsPage({ session, results, setResults, setSession, setPage }) {
   const [stats, setStats] = useState(null);
   const [roster, setRoster] = useState(null);
@@ -1785,6 +1924,7 @@ export default function App() {
         {page === "scan" && <ScanPage session={session} setSession={setSession} setResults={setResults} results={results} />}
         {page === "review" && <ReviewPage session={session} results={results} setResults={setResults} />}
         {page === "results" && <ResultsPage session={session} results={results} setResults={setResults} setSession={setSession} setPage={setPage} />}
+        {page === "forms" && <FormsPage session={session} results={results} />}
       </main>
     </div>
   );
