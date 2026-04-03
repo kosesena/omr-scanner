@@ -5,7 +5,7 @@ import {
   Camera, FileText, BarChart3, Settings, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, Download, Plus,
   Scan, RotateCcw, Users, Trophy, Target, Upload,
-  ClipboardList, Eye, Edit3, Check, X, UserPlus
+  ClipboardList, Eye, Edit3, Check, X, UserPlus, Trash2
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -1398,11 +1398,33 @@ function ReviewPage({ session, results }) {
 // Results Page
 // ============================================================
 
-function ResultsPage({ session, results }) {
+function ResultsPage({ session, results, setResults, setSession, setPage }) {
   const [stats, setStats] = useState(null);
   const [roster, setRoster] = useState(null);
 
   const successResults = results.filter((r) => r.success && r.score != null);
+
+  const deleteResult = async (index) => {
+    if (!confirm("Bu tarama sonucunu silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/api/sessions/${session.session_id}/results/${index}`);
+      setResults((prev) => prev.filter((_, i) => i !== index));
+    } catch {
+      alert("Silinemedi");
+    }
+  };
+
+  const deleteExam = async () => {
+    if (!confirm("Bu sınavı ve tüm sonuçlarını silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/api/sessions/${session.session_id}`);
+      setSession(null);
+      setResults([]);
+      setPage("setup");
+    } catch {
+      alert("Silinemedi");
+    }
+  };
 
   useEffect(() => {
     if (session?.session_id && successResults.length > 0) {
@@ -1500,21 +1522,39 @@ function ResultsPage({ session, results }) {
         </div>
       )}
 
-      {/* Export */}
-      {successResults.length > 0 && (
+      {/* Export & Delete exam */}
+      <div className="flex gap-2">
+        {successResults.length > 0 && (
+          <button
+            onClick={exportCSV}
+            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 flex items-center justify-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            CSV Dışa Aktar
+          </button>
+        )}
         <button
-          onClick={exportCSV}
-          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium text-slate-700 flex items-center justify-center gap-2"
+          onClick={deleteExam}
+          className="py-2.5 px-4 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-medium text-red-600 flex items-center justify-center gap-2"
         >
-          <Download className="w-4 h-4" />
-          CSV Dışa Aktar
+          <Trash2 className="w-4 h-4" />
+          Sınavı Sil
         </button>
-      )}
+      </div>
 
       {/* Individual results */}
       <div className="space-y-3">
         {results.map((r, i) => (
-          <ResultCard key={i} result={r} answerKey={session.answer_key} />
+          <div key={i} className="relative">
+            <ResultCard result={r} answerKey={session.answer_key} />
+            <button
+              onClick={() => deleteResult(i)}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Sonucu sil"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         ))}
       </div>
 
@@ -1708,7 +1748,7 @@ export default function App() {
         {page === "roster" && <RosterPage session={session} setSession={setSession} setPage={setPage} />}
         {page === "scan" && <ScanPage session={session} setSession={setSession} setResults={setResults} results={results} />}
         {page === "review" && <ReviewPage session={session} results={results} />}
-        {page === "results" && <ResultsPage session={session} results={results} />}
+        {page === "results" && <ResultsPage session={session} results={results} setResults={setResults} setSession={setSession} setPage={setPage} />}
       </main>
     </div>
   );

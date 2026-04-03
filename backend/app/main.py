@@ -191,6 +191,19 @@ def delete_session_endpoint(session_id: str):
     return {"message": "Session deleted"}
 
 
+@app.delete("/api/sessions/{session_id}/results/{result_index}")
+def delete_result_endpoint(session_id: str, result_index: int):
+    """Delete a single scan result from a session."""
+    if session_id not in sessions:
+        raise HTTPException(404, "Session not found")
+    session = sessions[session_id]
+    if result_index < 0 or result_index >= len(session.results):
+        raise HTTPException(404, "Result not found")
+    session.results.pop(result_index)
+    save_session(session)
+    return {"message": "Result deleted"}
+
+
 # =====================
 # Class Roster
 # =====================
