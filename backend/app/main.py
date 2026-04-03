@@ -522,9 +522,9 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
                         surname_field.needs_review or
                         number_field.needs_review)
 
-    # Step 4: Encode form image for review if needed
+    # Step 4: Encode form image (always save for later review)
     form_image_b64 = None
-    if needs_review and warped is not None:
+    if warped is not None:
         _, buffer = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, 60])
         form_image_b64 = base64.b64encode(buffer).decode("utf-8")
 
