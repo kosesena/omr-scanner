@@ -31,6 +31,7 @@ from app.omr_engine import OMREngine
 from app.form_generator import generate_form_pdf
 from app.qr_reader import read_qr_from_image
 from app.ocr_engine import OCREngine
+from app.storage import init_db, save_session, load_all_sessions, delete_session
 
 app = FastAPI(
     title="OMR Scanner API",
@@ -46,8 +47,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage
-sessions: dict[str, ExamSession] = {}
+# Persistent storage — load saved sessions from SQLite on startup
+init_db()
+sessions: dict[str, ExamSession] = load_all_sessions()
 
 FORMS_DIR = "/tmp/omr_forms"
 os.makedirs(FORMS_DIR, exist_ok=True)
@@ -138,6 +140,7 @@ def create_session(req: AnswerKeyRequest):
         num_questions=req.num_questions,
     )
     sessions[session_id] = session
+    save_session(session)
     return {
         "session_id": session_id,
         "num_questions": req.num_questions,
@@ -184,6 +187,7 @@ def upload_roster(session_id: str, req: RosterUploadRequest):
             student_number=str(s.get("student_number", "")).strip(),
         ))
     session.roster = ClassRoster(students=students)
+    save_session(session)
 
     return {
         "message": f"{len(students)} students uploaded",
@@ -229,6 +233,7 @@ async def upload_roster_pdf(session_id: str, file: UploadFile = File(...)):
         added += 1
 
     session.roster = ClassRoster(students=existing)
+    save_session(session)
 
     return {
         "message": f"{added} yeni ogrenci eklendi (toplam {len(existing)})",
@@ -581,6 +586,7 @@ async def scan_sheet(
             session.pending_review.append(result_idx)
         if response.success:
             _match_student_to_roster(session, response, result_idx)
+        save_session(session)
 
     return response
 
@@ -630,6 +636,7 @@ async def scan_sheet_base64(
             session.pending_review.append(result_idx)
         if response.success:
             _match_student_to_roster(session, response, result_idx)
+        save_session(session)
 
     return response
 
@@ -687,6 +694,7 @@ def verify_result(session_id: str, req: VerificationRequest):
         # Re-match to roster with corrected data
         _match_student_to_roster(session, result, idx)
 
+    save_session(session)
     return {"message": "Verified", "index": idx}
 
 

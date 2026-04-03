@@ -1211,16 +1211,109 @@ function StatCard({ icon: Icon, label, value, color = "text-slate-900 dark:text-
 // App
 // ============================================================
 
+// ============================================================
+// Saved Sessions List
+// ============================================================
+
+function SavedSessionsList({ onResume, onNew }) {
+  const [savedSessions, setSavedSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API}/api/sessions`)
+      .then((res) => setSavedSessions(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const resumeSession = async (s) => {
+    try {
+      const res = await axios.get(`${API}/api/sessions/${s.session_id}`);
+      const data = res.data;
+      onResume({
+        session: {
+          session_id: data.session_id,
+          num_questions: data.num_questions,
+          use_booklet: data.use_booklet,
+          answer_key: data.answer_key,
+          answer_key_b: data.answer_key_b,
+          course_code: data.course_code || "",
+        },
+        results: data.results || [],
+      });
+    } catch (e) {
+      alert("Oturum yüklenemedi");
+    }
+  };
+
+  if (loading) return <div className="text-center py-8 text-slate-500">Yükleniyor...</div>;
+  if (savedSessions.length === 0) return null;
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 mt-6">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+          <ClipboardList className="w-4 h-4" />
+          Kayıtlı Sınavlar
+        </h3>
+        <div className="space-y-2">
+          {savedSessions.map((s) => (
+            <button
+              key={s.session_id}
+              onClick={() => resumeSession(s)}
+              className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors text-left"
+            >
+              <div>
+                <span className="text-sm font-medium text-slate-900 dark:text-white">
+                  {s.session_id}
+                </span>
+                <span className="text-xs text-slate-500 ml-2">
+                  {s.num_questions} soru
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                {s.scanned_count > 0 && (
+                  <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                    {s.scanned_count} tarandı
+                  </span>
+                )}
+                {s.roster_count > 0 && (
+                  <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                    {s.roster_count} öğrenci
+                  </span>
+                )}
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [page, setPage] = useState("setup");
   const [session, setSession] = useState(null);
   const [results, setResults] = useState([]);
 
+  const handleResume = ({ session: s, results: r }) => {
+    setSession(s);
+    setResults(r);
+    setPage(r.length > 0 ? "results" : "scan");
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Header page={page} setPage={setPage} session={session} />
       <main className="pb-20">
-        {page === "setup" && <SetupPage session={session} setSession={setSession} setPage={setPage} />}
+        {page === "setup" && (
+          <>
+            <SavedSessionsList onResume={handleResume} />
+            <SetupPage session={session} setSession={setSession} setPage={setPage} />
+          </>
+        )}
         {page === "roster" && <RosterPage session={session} setPage={setPage} />}
         {page === "scan" && <ScanPage session={session} setResults={setResults} results={results} />}
         {page === "review" && <ReviewPage session={session} results={results} />}
