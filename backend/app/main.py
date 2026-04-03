@@ -709,7 +709,7 @@ async def scan_sheet(
         raise HTTPException(400, "Invalid image file")
 
     # Resize large images to prevent memory issues on free tier
-    max_dim = 2000
+    max_dim = 2500
     h, w = img.shape[:2]
     if max(h, w) > max_dim:
         scale = max_dim / max(h, w)
@@ -772,7 +772,7 @@ async def scan_sheet_base64(
         raise HTTPException(400, "Could not decode image")
 
     # Resize large images to prevent memory issues on free tier
-    max_dim = 2000
+    max_dim = 2500
     h, w = img.shape[:2]
     if max(h, w) > max_dim:
         scale = max_dim / max(h, w)

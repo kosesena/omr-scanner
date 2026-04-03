@@ -470,18 +470,21 @@ class OMREngine:
 
         # Step 1: Detect ArUco markers
         markers = self.detect_markers(image)
-        if len(markers) < 4:
-            missing = [m for m in [0, 1, 2, 3] if m not in markers]
+        logger.info(f"Found {len(markers)} ArUco markers: {list(markers.keys())}")
+        logger.info(f"Image shape: {image.shape}, dtype: {image.dtype}")
+
+        required = [0, 1, 2, 3]
+        missing = [m for m in required if m not in markers]
+        if missing:
             pos_names = {0: "sol üst", 1: "sağ üst", 2: "sol alt", 3: "sağ alt"}
             missing_str = ", ".join(f"{m} ({pos_names.get(m, '')})" for m in missing)
-            result.error = (f"4 köşe işaretçisinden {4-len(markers)} tanesi bulunamadı: {missing_str}. "
+            found_str = ", ".join(str(m) for m in markers.keys())
+            result.error = (f"Köşe işaretçileri eksik: {missing_str}. "
+                           f"Bulunan: [{found_str}]. "
                            f"Formu düz bir yüzeyde, iyi aydınlatılmış ortamda, tüm köşeler görünecek şekilde çekin.")
             return result
 
-        logger.info(f"Found {len(markers)} ArUco markers: {list(markers.keys())}")
-
         # Step 2: Perspective transform
-        logger.info(f"Image shape: {image.shape}, dtype: {image.dtype}")
         try:
             warped = self.perspective_transform(image, markers)
         except Exception as e:
@@ -489,7 +492,7 @@ class OMREngine:
             result.error = f"Perspektif düzeltme hatası: {str(e)}"
             return result
         if warped is None:
-            result.error = "Perspektif düzeltme başarısız — köşe koordinatları hesaplanamadı"
+            result.error = "Perspektif düzeltme başarısız"
             return result
 
         # Convert to grayscale
