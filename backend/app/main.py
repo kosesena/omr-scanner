@@ -473,15 +473,30 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
     # Use raw (non-CLAHE) grayscale for OCR — CLAHE amplifies paper texture noise
     warped = engine.last_warped_gray_raw if engine.last_warped_gray_raw is not None else engine.last_warped_gray
 
+    # Pass roster to OCR engine for name/surname matching
+    if session_id and session_id in sessions:
+        sess = sessions[session_id]
+        if sess.roster and sess.roster.students:
+            ocr.set_roster([
+                {"name": s.name, "surname": s.surname,
+                 "student_number": s.student_number}
+                for s in sess.roster.students
+            ])
+
     student_name_result = None
     student_surname_result = None
     student_number_result = None
     needs_review = False
 
     if warped is not None:
+        # Read student_no first (Tesseract digits), then use it for name matching
+        number_field = ocr.read_field(warped, "student_no")
+        # Pass partial student_no to help name matching
+        if number_field.text and number_field.text != "?":
+            # Re-read name/surname with student_no hint for better roster matching
+            ocr._last_student_no = number_field.text
         name_field = ocr.read_field(warped, "name")
         surname_field = ocr.read_field(warped, "surname")
-        number_field = ocr.read_field(warped, "student_no")
 
         student_name_result = CharFieldResult(
             text=name_field.text,

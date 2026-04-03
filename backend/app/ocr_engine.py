@@ -1,14 +1,20 @@
 """
 OCR Engine for character box reading.
-Uses Tesseract OCR for handwriting recognition.
-Each character box is read individually (--psm 10 = single char mode).
+
+Strategy:
+- Student number: read each digit box with Tesseract (--psm 10, digits only)
+  with aggressive preprocessing (large upscale, normalize, adaptive threshold).
+- Name/Surname: detect filled box pattern (which boxes have ink) and
+  match against the class roster. Tesseract is too unreliable for
+  handwritten letters at this resolution (~27px boxes from phone camera).
+
 Box positions computed from form_generator.py layout.
 """
 
 import cv2
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -106,173 +112,408 @@ class FieldResult:
     avg_confidence: float = 0.0
     needs_review: bool = False
     char_confidences: list = field(default_factory=list)
+    box_pattern: list = field(default_factory=list)  # True/False per box
 
 
 class OCREngine:
-    """Handwriting recognition — reads each character box individually."""
+    """
+    Hybrid OCR: digit recognition + roster matching for names.
+    """
 
     def __init__(self):
-        pass
+        self._roster_students = []  # Set externally for matching
+        self._last_student_no = ""  # Set after reading student_no, used for name matching
 
-    def _extract_single_box(self, warped_gray: np.ndarray,
-                             box: tuple) -> Optional[np.ndarray]:
-        """Extract a single character box, cropping out borders."""
+    def set_roster(self, students: list):
+        """Set the roster for name/surname matching.
+        students: list of dicts with 'name', 'surname', 'student_number'"""
+        self._roster_students = students or []
+
+    # ---- Box extraction and analysis ----
+
+    def _extract_box(self, warped_gray: np.ndarray, box: tuple) -> Optional[np.ndarray]:
+        """Extract a single character box region."""
         x1, y1, x2, y2 = box
         h, w = warped_gray.shape[:2]
-
-        x1 = max(0, x1)
-        y1 = max(0, y1)
-        x2 = min(w, x2)
-        y2 = min(h, y2)
-
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
         if x2 <= x1 or y2 <= y1:
             return None
+        return warped_gray[y1:y2, x1:x2]
 
-        cell = warped_gray[y1:y2, x1:x2]
-
-        # Crop inner ~70% to remove box border lines
-        ch, cw = cell.shape[:2]
-        pad_x = max(2, int(cw * 0.15))
-        pad_y = max(2, int(ch * 0.15))
-        inner = cell[pad_y:ch - pad_y, pad_x:cw - pad_x]
-
-        if inner.size == 0:
+    def _get_inner(self, cell: np.ndarray, margin_frac: float = 0.18) -> Optional[np.ndarray]:
+        """Crop inner portion of a box, removing border lines."""
+        if cell is None or cell.size == 0:
             return None
+        ch, cw = cell.shape[:2]
+        px = max(2, int(cw * margin_frac))
+        py = max(2, int(ch * margin_frac))
+        inner = cell[py:ch - py, px:cw - px]
+        return inner if inner.size > 0 else None
 
-        return inner
-
-    def _is_box_empty(self, inner: np.ndarray) -> bool:
-        """Check if a box is empty (no handwriting)."""
+    def _box_ink_score(self, inner: np.ndarray) -> float:
+        """
+        Score how much ink is in a box (0.0 = empty, 1.0 = very full).
+        Uses multiple features for robustness.
+        """
         if inner is None or inner.size == 0:
-            return True
+            return 0.0
 
         mean_val = float(np.mean(inner))
-        # Dark pixel ratio (pixels darker than 140)
-        dark_ratio = float(np.sum(inner < 140)) / max(inner.size, 1)
+        # Dark pixel ratio at different thresholds
+        dark_hard = float(np.sum(inner < 120)) / inner.size  # definite ink
+        dark_soft = float(np.sum(inner < 160)) / inner.size  # light pencil/pen
 
-        # Empty box: mostly white, very few dark pixels
-        if mean_val > 180 and dark_ratio < 0.08:
-            return True
+        # Std dev (empty boxes have very low std)
+        std_val = float(np.std(inner))
 
-        return False
+        # Combine: weighted score
+        score = 0.0
+        # Mean darkness (255=white, lower=darker)
+        score += max(0, (200 - mean_val) / 120) * 0.3
+        # Hard dark pixels
+        score += min(dark_hard * 5, 1.0) * 0.35
+        # Soft dark pixels
+        score += min(dark_soft * 3, 1.0) * 0.2
+        # Variation (handwriting has texture)
+        score += min(std_val / 60, 1.0) * 0.15
 
-    def _preprocess_single_char(self, img: np.ndarray) -> np.ndarray:
-        """Preprocess a single character box for Tesseract."""
-        if img is None or img.size == 0:
-            return img
+        return min(score, 1.0)
 
-        # Upscale significantly — Tesseract needs at least ~30px tall characters
-        target_h = 80
-        scale = max(target_h / max(img.shape[0], 1), 2)
-        upscaled = cv2.resize(img, None, fx=scale, fy=scale,
-                               interpolation=cv2.INTER_CUBIC)
+    def _detect_filled_boxes(self, warped_gray: np.ndarray,
+                              field_name: str) -> list:
+        """
+        Detect which boxes are filled with ink.
+        Returns list of (box_idx, is_filled, ink_score) tuples.
+        """
+        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+        results = []
 
-        # Binarize with Otsu
-        _, binary = cv2.threshold(upscaled, 0, 255,
-                                   cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        for i, box in enumerate(boxes):
+            cell = self._extract_box(warped_gray, box)
+            inner = self._get_inner(cell)
+            score = self._box_ink_score(inner)
+            # Threshold for "filled" — be generous to catch light writing
+            is_filled = score > 0.15
+            results.append((i, is_filled, score))
 
-        # Add white border (Tesseract needs some padding around chars)
-        border = 15
+        return results
+
+    # ---- Digit recognition with Tesseract ----
+
+    def _preprocess_digit(self, cell: np.ndarray) -> Optional[np.ndarray]:
+        """Aggressively preprocess a digit box for Tesseract."""
+        if cell is None or cell.size == 0:
+            return None
+
+        # Get inner region (remove box borders)
+        inner = self._get_inner(cell, margin_frac=0.20)
+        if inner is None:
+            return None
+
+        # Step 1: Upscale to ~120px tall
+        target_h = 120
+        scale = max(target_h / max(inner.shape[0], 1), 3)
+        big = cv2.resize(inner, None, fx=scale, fy=scale,
+                          interpolation=cv2.INTER_CUBIC)
+
+        # Step 2: Normalize contrast (stretch to full 0-255 range)
+        min_v, max_v = float(np.min(big)), float(np.max(big))
+        if max_v - min_v > 20:
+            normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+        else:
+            normalized = big
+
+        # Step 3: Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+
+        # Step 4: Adaptive threshold (handles uneven lighting better than Otsu)
+        binary = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 21, 8
+        )
+
+        # Step 5: Morphological close — fill small gaps in strokes
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+        # Step 6: Add generous white border
+        border = 20
         padded = cv2.copyMakeBorder(binary, border, border, border, border,
                                      cv2.BORDER_CONSTANT, value=255)
 
         return padded
 
-    def _tesseract_single_char(self, img: np.ndarray, char_type: str) -> tuple:
-        """Run Tesseract on a single character. Returns (char, confidence)."""
-        if not HAS_TESSERACT or img is None or img.size == 0:
-            return ("", 0.0)
+    def _read_digit(self, cell: np.ndarray) -> tuple:
+        """Read a single digit from a box. Returns (digit_str, confidence)."""
+        if not HAS_TESSERACT:
+            return ("?", 0.0)
 
-        # PSM 10 = single character mode
-        if char_type == "numeric":
-            config = "--psm 10 -c tessedit_char_whitelist=0123456789"
-        else:
-            config = "--psm 10 -c tessedit_char_whitelist=ABCCDEFGGHIIJKLMNOOPQRSSTUUVWXYZÇĞİÖŞÜ"
+        processed = self._preprocess_digit(cell)
+        if processed is None:
+            return ("?", 0.0)
 
+        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"
         try:
-            data = pytesseract.image_to_data(
-                img, lang="tur" if char_type != "numeric" else "eng",
-                config=config, output_type=pytesseract.Output.DICT
-            )
+            # Try image_to_string first (simpler, often works for digits)
+            text = pytesseract.image_to_string(
+                processed, lang="eng", config=config
+            ).strip()
 
-            best_text = ""
-            best_conf = 0.0
+            if text and text[0].isdigit():
+                # Also get confidence
+                data = pytesseract.image_to_data(
+                    processed, lang="eng", config=config,
+                    output_type=pytesseract.Output.DICT
+                )
+                conf = 0.0
+                for i, t in enumerate(data["text"]):
+                    if t.strip():
+                        c = int(data["conf"][i])
+                        if c > conf:
+                            conf = c
+                return (text[0], conf / 100.0)
 
-            for i, text in enumerate(data["text"]):
-                text = text.strip()
-                if text:
-                    conf = int(data["conf"][i])
-                    if conf > best_conf:
-                        best_text = text
-                        best_conf = conf
-
-            # Normalize: take only first character
-            if best_text:
-                best_text = best_text[0].upper()
-
-            return (best_text, best_conf / 100.0 if best_conf > 0 else 0.0)
-
+            return ("?", 0.0)
         except Exception as e:
-            logger.warning(f"Tesseract error: {e}")
+            logger.warning(f"Tesseract digit error: {e}")
+            return ("?", 0.0)
+
+    # ---- Name/Surname recognition via roster matching ----
+
+    def _build_box_pattern(self, filled_boxes: list) -> tuple:
+        """
+        Build a text pattern from filled boxes.
+        Returns (pattern_str, char_count, word_lengths).
+        Example: "SENA NUR" → filled=[0,1,2,3, 5,6,7] → lengths=[4, 3]
+        """
+        # Find last filled box
+        last_filled = -1
+        for idx, is_filled, score in filled_boxes:
+            if is_filled:
+                last_filled = idx
+
+        if last_filled < 0:
+            return ("", 0, [])
+
+        # Build pattern up to last filled
+        pattern = []
+        for idx, is_filled, score in filled_boxes:
+            if idx > last_filled:
+                break
+            pattern.append("X" if is_filled else " ")
+
+        pattern_str = "".join(pattern)
+
+        # Extract word lengths
+        words = pattern_str.split()
+        word_lengths = [len(w) for w in words if w]
+        char_count = sum(word_lengths)
+
+        return (pattern_str, char_count, word_lengths)
+
+    def _match_roster_name(self, field_name: str, pattern_str: str,
+                            char_count: int, word_lengths: list,
+                            student_no: str = "") -> tuple:
+        """
+        Match detected box pattern against roster.
+        Returns (best_match_text, confidence).
+        """
+        if not self._roster_students:
             return ("", 0.0)
+
+        candidates = []
+        for student in self._roster_students:
+            if field_name == "name":
+                text = student.get("name", "").strip().upper()
+            elif field_name == "surname":
+                text = student.get("surname", "").strip().upper()
+            else:
+                continue
+
+            if not text:
+                continue
+
+            # If we know student_no, only consider matching students
+            if student_no and student_no != "?":
+                sno = student.get("student_number", "")
+                if sno and student_no not in sno and sno not in student_no:
+                    continue
+
+            # Compare word structure
+            text_words = text.split()
+            text_lengths = [len(w) for w in text_words]
+            text_total = sum(text_lengths)
+
+            score = 0.0
+
+            # Total character count match
+            if text_total == char_count:
+                score += 0.5
+            elif abs(text_total - char_count) <= 1:
+                score += 0.2
+
+            # Word count match
+            if len(text_lengths) == len(word_lengths):
+                score += 0.2
+                # Individual word length match
+                length_matches = sum(1 for a, b in zip(text_lengths, word_lengths)
+                                     if a == b)
+                score += 0.3 * length_matches / max(len(text_lengths), 1)
+
+            if score > 0:
+                candidates.append((text, score))
+
+        if not candidates:
+            return ("", 0.0)
+
+        # Sort by score, pick best
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        best_text, best_score = candidates[0]
+
+        # If there's a unique high-score match, confidence is high
+        if len(candidates) == 1 and best_score >= 0.5:
+            return (best_text, 0.9)
+        elif best_score >= 0.7:
+            return (best_text, 0.8)
+        elif best_score >= 0.5:
+            return (best_text, 0.6)
+        else:
+            return (best_text, 0.3)
+
+    # ---- Public API ----
 
     def read_field(self, warped_gray: np.ndarray,
                    field_name: str) -> FieldResult:
-        """Read a field by reading each character box individually."""
-        char_type = "numeric" if field_name == "student_no" else "alpha"
+        """
+        Read a field:
+        - student_no: per-box Tesseract digit recognition
+        - name/surname: filled box pattern + roster matching
+        """
         boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+        filled_info = self._detect_filled_boxes(warped_gray, field_name)
 
+        # Build box pattern (which boxes have ink)
+        pattern_str, char_count, word_lengths = self._build_box_pattern(filled_info)
+        box_pattern = [f for _, f, _ in filled_info]
+
+        logger.info(f"OCR {field_name}: pattern='{pattern_str}' "
+                     f"chars={char_count} words={word_lengths}")
+
+        if field_name == "student_no":
+            return self._read_student_no(warped_gray, boxes, filled_info, box_pattern)
+        else:
+            return self._read_name_field(
+                warped_gray, field_name, filled_info,
+                pattern_str, char_count, word_lengths, box_pattern
+            )
+
+    def _read_student_no(self, warped_gray: np.ndarray, boxes: list,
+                          filled_info: list, box_pattern: list) -> FieldResult:
+        """Read student number using per-digit Tesseract."""
         characters = []
         confidences = []
-        trailing_empty = 0
 
-        for box in boxes:
-            inner = self._extract_single_box(warped_gray, box)
-
-            if self._is_box_empty(inner):
-                # Check if all remaining boxes are also empty → stop
-                remaining_idx = boxes.index(box)
-                all_remaining_empty = True
-                for rem_box in boxes[remaining_idx + 1:]:
-                    rem_inner = self._extract_single_box(warped_gray, rem_box)
-                    if not self._is_box_empty(rem_inner):
-                        all_remaining_empty = False
-                        break
-
-                if all_remaining_empty:
-                    break  # End of text
-
-                # Gap in the middle (e.g., "SENA NUR" has space)
-                characters.append(" ")
-                confidences.append(1.0)
-                continue
-
-            # Non-empty box → OCR
-            processed = self._preprocess_single_char(inner)
-
-            if HAS_TESSERACT:
-                char, conf = self._tesseract_single_char(processed, char_type)
-            else:
-                char, conf = ("?", 0.3)
-
-            if char:
-                characters.append(char)
-                confidences.append(conf)
-            else:
+        for idx, is_filled, ink_score in filled_info:
+            if not is_filled:
+                # Check if all remaining are empty
+                remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
+                if not remaining_filled:
+                    break
+                # Gap shouldn't happen in student number, but handle it
                 characters.append("?")
                 confidences.append(0.0)
+                continue
 
-        text = "".join(characters).strip()
+            cell = self._extract_box(warped_gray, boxes[idx])
+            digit, conf = self._read_digit(cell)
+            characters.append(digit)
+            confidences.append(conf)
+
+        text = "".join(characters)
         avg_conf = sum(confidences) / max(len(confidences), 1)
+
+        # Try roster matching for student_no too
+        if "?" in text and self._roster_students:
+            matched = self._match_student_no_roster(text)
+            if matched:
+                text = matched
+                avg_conf = max(avg_conf, 0.7)
+
         needs_review = avg_conf < 0.5 or not text or "?" in text
 
-        logger.info(f"OCR {field_name}: '{text}' (conf={avg_conf:.2f}, "
-                     f"chars={len(characters)})")
+        logger.info(f"OCR student_no: '{text}' (conf={avg_conf:.2f})")
 
         return FieldResult(
             text=text,
-            characters=characters,
+            characters=list(text),
             avg_confidence=avg_conf,
             needs_review=needs_review,
             char_confidences=confidences,
+            box_pattern=box_pattern,
+        )
+
+    def _match_student_no_roster(self, partial_no: str) -> str:
+        """Try to match a partial student number (with ? wildcards) to roster."""
+        if not self._roster_students:
+            return ""
+
+        candidates = []
+        for student in self._roster_students:
+            sno = student.get("student_number", "").strip()
+            if not sno or len(sno) != len(partial_no):
+                continue
+
+            match = True
+            for a, b in zip(partial_no, sno):
+                if a != "?" and a != b:
+                    match = False
+                    break
+
+            if match:
+                candidates.append(sno)
+
+        if len(candidates) == 1:
+            return candidates[0]
+
+        return ""
+
+    def _read_name_field(self, warped_gray: np.ndarray, field_name: str,
+                          filled_info: list, pattern_str: str,
+                          char_count: int, word_lengths: list,
+                          box_pattern: list) -> FieldResult:
+        """Read name/surname field using box pattern + roster matching."""
+
+        # Try roster matching (use student_no hint if available)
+        matched_text, match_conf = self._match_roster_name(
+            field_name, pattern_str, char_count, word_lengths,
+            student_no=self._last_student_no
+        )
+
+        if matched_text and match_conf >= 0.5:
+            text = matched_text
+            avg_conf = match_conf
+        else:
+            # No roster match — show pattern with char count
+            # e.g., "XXXX XXX" → "[4] [3]" or just the raw pattern
+            if word_lengths:
+                text = " ".join("?" * l for l in word_lengths)
+            elif char_count > 0:
+                text = "?" * char_count
+            else:
+                text = ""
+            avg_conf = 0.0
+
+        needs_review = avg_conf < 0.7 or not text
+
+        logger.info(f"OCR {field_name}: '{text}' (conf={avg_conf:.2f}, "
+                     f"roster_match={bool(matched_text)})")
+
+        return FieldResult(
+            text=text,
+            characters=list(text),
+            avg_confidence=avg_conf,
+            needs_review=needs_review,
+            char_confidences=[avg_conf] * max(len(text), 1),
+            box_pattern=box_pattern,
         )
