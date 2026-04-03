@@ -170,161 +170,232 @@ function SetupPage({ session, setSession, setPage }) {
     setFormLoading(false);
   };
 
+  const filledCount = Object.keys(keys).length;
+  const allFilled = filledCount === numQ;
+  const bothFilled = !useBooklet || (Object.keys(keysA).length === numQ && Object.keys(keysB).length === numQ);
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-5">
-      {/* Exam setup */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Sınav Ayarları</h2>
 
-        <div className="flex items-center gap-3 flex-wrap mb-3">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Soru sayısı:</label>
-          <div className="flex gap-2">
-            {[20, 40].map((n) => (
-              <button
-                key={n}
-                onClick={() => { setNumQ(n); setKeysA({}); setKeysB({}); }}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                  numQ === n
-                    ? "bg-blue-500 text-white shadow-md"
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                )}
-              >
-                {n}
-              </button>
-            ))}
+      {/* Step 1: Exam setup */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold">1</span>
+            <h2 className="font-semibold text-slate-900 dark:text-white">Sınav Oluşturma</h2>
           </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 ml-8">
+            Sınavınızın temel ayarlarını belirleyin. Bu ayarlar optik form ve cevap anahtarı için kullanılacaktır.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap mb-3">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Şık sayısı:</label>
-          <div className="flex gap-2">
-            {[4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => changeOpts(n)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                  numOpts === n
-                    ? "bg-blue-500 text-white shadow-md"
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                )}
-              >
-                {n === 4 ? "A-B-C-D" : "A-B-C-D-E"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 mb-3">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Ders kodu:</label>
-          <input
-            type="text"
-            value={courseCode}
-            onChange={(e) => setCourseCode(e.target.value)}
-            placeholder="ör: MAT101"
-            className="px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white w-32"
-          />
-        </div>
-
-        <div className="flex items-center gap-3 mb-3">
-          <label className="text-sm text-slate-600 dark:text-slate-400">Kitapçık A/B:</label>
-          <button
-            onClick={() => { setUseBooklet(!useBooklet); setActiveBooklet("A"); }}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-              useBooklet
-                ? "bg-emerald-500 text-white shadow-md"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-            )}
-          >
-            {useBooklet ? "Açık" : "Kapalı"}
-          </button>
-          {useBooklet && (
-            <span className="text-xs text-slate-400">İki farklı cevap anahtarı gireceksiniz</span>
-          )}
-        </div>
-
-        <button
-          onClick={downloadForm}
-          disabled={formLoading}
-          className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          <Download className="w-4 h-4" />
-          {formLoading ? "İndiriliyor..." : "Optik form indir (PDF)"}
-        </button>
-      </div>
-
-      {/* Answer key */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
-            {useBooklet && (
-              <div className="flex gap-1">
-                {["A", "B"].map((b) => (
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1.5">Soru Sayısı</label>
+              <p className="text-xs text-slate-400 mb-2">Sınavdaki toplam soru sayısını seçin</p>
+              <div className="flex gap-2">
+                {[20, 40].map((n) => (
                   <button
-                    key={b}
-                    onClick={() => setActiveBooklet(b)}
+                    key={n}
+                    onClick={() => { setNumQ(n); setKeysA({}); setKeysB({}); }}
                     className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-bold transition-all",
-                      activeBooklet === b
-                        ? "bg-blue-500 text-white shadow"
-                        : "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                      "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      numQ === n
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
                     )}
                   >
-                    Kitapçık {b}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline">
-            Rastgele doldur (test)
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          {Array.from({ length: numQ }, (_, i) => i + 1).map((q) => (
-            <div key={q} className="flex items-center gap-3 py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50">
-              <span className="text-sm font-semibold text-slate-500 w-8 text-right shrink-0">{q}.</span>
-              <div className="flex gap-1.5">
-                {options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setAnswer(q, opt)}
-                    className={cn(
-                      "w-9 h-9 rounded-full text-xs font-bold transition-all",
-                      keys[String(q)] === opt
-                        ? "bg-blue-500 text-white scale-110 shadow"
-                        : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200"
-                    )}
-                  >
-                    {opt}
+                    {n} Soru
                   </button>
                 ))}
               </div>
             </div>
-          ))}
+
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1.5">Şık Sayısı</label>
+              <p className="text-xs text-slate-400 mb-2">Her soru için kaç seçenek olacağını belirleyin</p>
+              <div className="flex gap-2">
+                {[4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => changeOpts(n)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      numOpts === n
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                    )}
+                  >
+                    {n === 4 ? "A-B-C-D" : "A-B-C-D-E"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1.5">Ders Kodu</label>
+              <p className="text-xs text-slate-400 mb-2">Sınavın ait olduğu ders (formda ve kayıtlarda görünür)</p>
+              <input
+                type="text"
+                value={courseCode}
+                onChange={(e) => setCourseCode(e.target.value.toUpperCase())}
+                placeholder="ör: MAT101"
+                className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white w-full max-w-[180px]"
+              />
+            </div>
+
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1.5">Kitapçık A/B</label>
+              <p className="text-xs text-slate-400 mb-2">Farklı soru sıralaması olan iki kitapçık kullanıyorsanız açın</p>
+              <button
+                onClick={() => { setUseBooklet(!useBooklet); setActiveBooklet("A"); }}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                  useBooklet
+                    ? "bg-emerald-500 text-white shadow-md"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                )}
+              >
+                {useBooklet ? "Açık — İki ayrı cevap anahtarı" : "Kapalı — Tek kitapçık"}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
+            <button
+              onClick={downloadForm}
+              disabled={formLoading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              {formLoading ? "İndiriliyor..." : "Yazdırılabilir Optik Form İndir (PDF)"}
+            </button>
+            <p className="text-xs text-slate-400 mt-1.5 ml-1">
+              Formu A4 kağıda yazdırın ve öğrencilere dağıtın. Form üzerinde ArUco işaretleri, QR kod ve cevap balonları bulunur.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Step 2: Answer key */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold">2</span>
+                <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
+                {useBooklet && (
+                  <div className="flex gap-1 ml-2">
+                    {["A", "B"].map((b) => (
+                      <button
+                        key={b}
+                        onClick={() => setActiveBooklet(b)}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                          activeBooklet === b
+                            ? "bg-blue-500 text-white shadow"
+                            : "bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200"
+                        )}
+                      >
+                        Kitapçık {b}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 ml-8">
+                {useBooklet
+                  ? `Her kitapçık için doğru cevapları tek tek işaretleyin. Şu an Kitapçık ${activeBooklet} düzenleniyor.`
+                  : "Her soru için doğru cevabı işaretleyin. Tüm soruların doldurulması zorunludur."
+                }
+              </p>
+            </div>
+            <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline shrink-0">
+              Rastgele doldur (test)
+            </button>
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-slate-500">
-            {useBooklet ? `${activeBooklet}: ` : ""}{Object.keys(keys).length}/{numQ} dolduruldu
-            {useBooklet && (
-              <span className="ml-2 text-xs">
-                (A: {Object.keys(keysA).length}, B: {Object.keys(keysB).length})
-              </span>
-            )}
-          </span>
-          <button
-            onClick={createSession}
-            disabled={loading}
-            className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium text-sm transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
-          >
-            {loading ? "Oluşturuluyor..." : "Devam et"}
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <div className="p-5">
+          <div className="flex flex-col gap-1">
+            {Array.from({ length: numQ }, (_, i) => i + 1).map((q) => (
+              <div key={q} className={cn(
+                "flex items-center gap-3 py-1.5 px-2 rounded-lg transition-colors",
+                keys[String(q)] ? "" : "bg-amber-50/50 dark:bg-amber-900/10",
+                "hover:bg-slate-50 dark:hover:bg-slate-700/50"
+              )}>
+                <span className="text-sm font-semibold text-slate-500 w-8 text-right shrink-0">{q}.</span>
+                <div className="flex gap-1.5">
+                  {options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setAnswer(q, opt)}
+                      className={cn(
+                        "w-9 h-9 rounded-full text-xs font-bold transition-all",
+                        keys[String(q)] === opt
+                          ? "bg-blue-500 text-white scale-110 shadow"
+                          : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200"
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                {!keys[String(q)] && (
+                  <span className="text-xs text-amber-500">Boş</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Progress and submit */}
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 h-2 w-32 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-300",
+                        allFilled ? "bg-emerald-500" : "bg-blue-500"
+                      )}
+                      style={{ width: `${(filledCount / numQ) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                    {filledCount}/{numQ}
+                  </span>
+                </div>
+                {useBooklet && (
+                  <p className="text-xs text-slate-400">
+                    Kitapçık A: {Object.keys(keysA).length}/{numQ} — Kitapçık B: {Object.keys(keysB).length}/{numQ}
+                  </p>
+                )}
+                {!allFilled && (
+                  <p className="text-xs text-amber-500 mt-0.5">
+                    {numQ - filledCount} soru daha işaretlenmeli
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={createSession}
+                disabled={loading || !bothFilled}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md flex items-center gap-2",
+                  bothFilled
+                    ? "bg-blue-500 hover:bg-blue-600 text-white"
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                )}
+              >
+                {loading ? "Oluşturuluyor..." : "Sınavı Oluştur ve Devam Et"}
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
