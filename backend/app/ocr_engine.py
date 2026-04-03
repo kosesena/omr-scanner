@@ -2,8 +2,8 @@
 OCR Engine for character box reading.
 Reads handwritten characters from boxed regions on OMR forms.
 
-Phase 1: Template matching + contour analysis
-Phase 2: CNN model (ONNX) - to be added later
+Positions are computed directly from form_generator.py layout parameters,
+ensuring exact alignment with the printed form.
 """
 
 import cv2
@@ -14,40 +14,90 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Character box positions as ratios of the warped image
-# These must match the form_generator layout
-CHAR_BOX_CONFIG = {
-    "name": {
-        "top": 0.072,
-        "left": 0.065,
-        "label_width_ratio": 0.04,
-        "num_boxes": 20,
-        "box_width": 0.031,
-        "box_height": 0.025,
-        "type": "alpha",
-    },
-    "surname": {
-        "top": 0.100,
-        "left": 0.065,
-        "label_width_ratio": 0.04,
-        "num_boxes": 20,
-        "box_width": 0.031,
-        "box_height": 0.025,
-        "type": "alpha",
-    },
-    "student_no": {
-        "top": 0.128,
-        "left": 0.065,
-        "label_width_ratio": 0.04,
-        "num_boxes": 9,
-        "box_width": 0.031,
-        "box_height": 0.025,
-        "type": "numeric",
-    },
+# Form layout constants (must match form_generator.py AND omr_engine.py)
+PAGE_W_PT = 595.28
+PAGE_H_PT = 841.89
+MM = 2.8346457
+MARGIN_PT = 14 * MM
+MARKER_MARGIN_PT = 6 * MM
+MARKER_SIZE_PT = 9 * MM
+
+WARP_W = 1000
+WARP_H = 1414
+WARP_MARGIN = 30
+
+_marker_half = MARKER_SIZE_PT / 2
+MARKERS_RL = {
+    0: (MARKER_MARGIN_PT + _marker_half,
+        PAGE_H_PT - MARKER_MARGIN_PT - _marker_half),
+    1: (PAGE_W_PT - MARKER_MARGIN_PT - _marker_half,
+        PAGE_H_PT - MARKER_MARGIN_PT - _marker_half),
+    2: (MARKER_MARGIN_PT + _marker_half,
+        MARKER_MARGIN_PT + _marker_half),
+    3: (PAGE_W_PT - MARKER_MARGIN_PT - _marker_half,
+        MARKER_MARGIN_PT + _marker_half),
 }
 
-# Confidence threshold for review
 REVIEW_THRESHOLD = 0.6
+
+
+def _rl_to_img(x_rl: float, y_rl: float) -> tuple:
+    """Convert ReportLab coordinate to warped image pixel."""
+    m = WARP_MARGIN
+    x_frac = (x_rl - MARKERS_RL[0][0]) / (MARKERS_RL[1][0] - MARKERS_RL[0][0])
+    x_img = m + x_frac * (WARP_W - 2 * m)
+    y_frac = (MARKERS_RL[0][1] - y_rl) / (MARKERS_RL[0][1] - MARKERS_RL[2][1])
+    y_img = m + y_frac * (WARP_H - 2 * m)
+    return x_img, y_img
+
+
+def _compute_char_box_positions():
+    """
+    Compute exact pixel positions of character boxes in the warped image,
+    replicating form_generator.py layout.
+
+    Returns dict: {field_name: [(x1, y1, x2, y2), ...]} in warped image pixels
+    """
+    title_y = PAGE_H_PT - MARKER_MARGIN_PT - MARKER_SIZE_PT - 5 * MM
+    box_y_start = title_y - 14 * MM
+    box_size = 5.5 * MM
+    label_w = 24 * MM
+    row_step = box_size + 3 * MM
+
+    fields = {}
+
+    # Three rows: AD, SOYAD, NO
+    field_defs = [
+        ("name", 0, 20),
+        ("surname", 1, 20),
+        ("student_no", 2, 9),
+    ]
+
+    for field_name, row_idx, num_boxes in field_defs:
+        y_rl = box_y_start - row_idx * row_step  # RL y of box bottom-left
+        bx_start = MARGIN_PT + label_w
+
+        boxes = []
+        for i in range(num_boxes):
+            # Box corners in RL coords
+            x_left_rl = bx_start + i * box_size
+            x_right_rl = x_left_rl + box_size
+            y_bottom_rl = y_rl
+            y_top_rl = y_rl + box_size
+
+            # Convert to warped image pixels
+            x1_img, y1_img = _rl_to_img(x_left_rl, y_top_rl)   # top-left in image
+            x2_img, y2_img = _rl_to_img(x_right_rl, y_bottom_rl)  # bottom-right in image
+
+            boxes.append((int(x1_img), int(y1_img), int(x2_img), int(y2_img)))
+
+        fields[field_name] = boxes
+
+    return fields
+
+
+# Pre-compute positions at module load
+CHAR_BOX_POSITIONS = _compute_char_box_positions()
 
 
 @dataclass
@@ -70,11 +120,12 @@ class OCREngine:
     """Handwriting recognition engine for character boxes."""
 
     def __init__(self):
-        self.empty_threshold = 0.03  # below this = empty box
+        self.empty_threshold = 0.03
         self.digit_templates = self._create_digit_templates()
+        self.alpha_templates = self._create_alpha_templates()
 
     def _create_digit_templates(self) -> dict:
-        """Create simple rendered templates for digits 0-9."""
+        """Create rendered templates for digits 0-9."""
         templates = {}
         for digit in range(10):
             img = np.zeros((40, 30), dtype=np.uint8)
@@ -84,7 +135,7 @@ class OCREngine:
         return templates
 
     def _create_alpha_templates(self) -> dict:
-        """Create rendered templates for A-Z + Turkish chars."""
+        """Create rendered templates for A-Z + digits."""
         templates = {}
         chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         for ch in chars:
@@ -95,38 +146,34 @@ class OCREngine:
         return templates
 
     def extract_box_images(self, warped_gray: np.ndarray,
-                           field_config: dict) -> list[np.ndarray]:
-        """Extract individual character images from box regions."""
+                           field_name: str) -> list[np.ndarray]:
+        """Extract individual character images using exact computed positions."""
         h, w = warped_gray.shape[:2]
 
-        top = int(h * field_config["top"])
-        left = int(w * (field_config["left"] + field_config["label_width_ratio"]))
-        box_w = int(w * field_config["box_width"])
-        box_h = int(h * field_config["box_height"])
-        num_boxes = field_config["num_boxes"]
+        if field_name not in CHAR_BOX_POSITIONS:
+            return []
 
         boxes = []
-        for i in range(num_boxes):
-            x1 = left + i * box_w
-            y1 = top
-            x2 = x1 + box_w
-            y2 = y1 + box_h
-
+        for (x1, y1, x2, y2) in CHAR_BOX_POSITIONS[field_name]:
             # Clamp to image bounds
-            x1 = max(0, min(x1, w - 1))
-            x2 = max(0, min(x2, w))
-            y1 = max(0, min(y1, h - 1))
-            y2 = max(0, min(y2, h))
+            x1c = max(0, min(x1, w - 1))
+            x2c = max(0, min(x2, w))
+            y1c = max(0, min(y1, h - 1))
+            y2c = max(0, min(y2, h))
 
-            if x2 <= x1 or y2 <= y1:
-                boxes.append(np.zeros((box_h, box_w), dtype=np.uint8))
+            if x2c <= x1c or y2c <= y1c:
+                boxes.append(np.zeros((20, 20), dtype=np.uint8))
                 continue
 
-            cell = warped_gray[y1:y2, x1:x2]
+            cell = warped_gray[y1c:y2c, x1c:x2c]
 
-            # Remove box borders (inner region)
-            pad = max(2, int(min(cell.shape) * 0.12))
-            inner = cell[pad:-pad, pad:-pad] if cell.shape[0] > 2 * pad and cell.shape[1] > 2 * pad else cell
+            # Remove box borders (inner region ~15% padding)
+            pad_y = max(2, int(cell.shape[0] * 0.15))
+            pad_x = max(2, int(cell.shape[1] * 0.15))
+            if cell.shape[0] > 2 * pad_y and cell.shape[1] > 2 * pad_x:
+                inner = cell[pad_y:-pad_y, pad_x:-pad_x]
+            else:
+                inner = cell
 
             boxes.append(inner)
 
@@ -137,12 +184,10 @@ class OCREngine:
         if box_img.size == 0:
             return True
 
-        # Adaptive threshold
         binary = cv2.adaptiveThreshold(
             box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV, 11, 5
         )
-
         fill_ratio = np.sum(binary > 0) / binary.size
         return fill_ratio < self.empty_threshold
 
@@ -151,34 +196,28 @@ class OCREngine:
         if box_img.size == 0 or self.is_empty_box(box_img):
             return CharacterResult("", 0.0)
 
-        # Preprocess
         binary = cv2.adaptiveThreshold(
             box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV, 11, 5
         )
-
-        # Resize to template size
         resized = cv2.resize(binary, (30, 40))
 
         best_match = ""
         best_score = 0.0
 
         for digit, template in self.digit_templates.items():
-            # Normalized cross-correlation
             result = cv2.matchTemplate(resized, template, cv2.TM_CCOEFF_NORMED)
             score = float(np.max(result))
             if score > best_score:
                 best_score = score
                 best_match = digit
 
-        # Also try contour-based features for digits
+        # Contour-based fallback
         contour_result = self._contour_digit_recognition(binary)
         if contour_result and contour_result[1] > best_score:
             best_match, best_score = contour_result
 
-        # Normalize confidence to 0-1
         confidence = max(0.0, min(1.0, (best_score + 0.5) / 1.5))
-
         return CharacterResult(best_match, confidence)
 
     def _contour_digit_recognition(self, binary: np.ndarray) -> Optional[tuple]:
@@ -187,28 +226,23 @@ class OCREngine:
         if not contours:
             return None
 
-        # Get the largest contour
         cnt = max(contours, key=cv2.contourArea)
         area = cv2.contourArea(cnt)
         if area < 20:
             return None
 
-        # Bounding rect aspect ratio
         x, y, bw, bh = cv2.boundingRect(cnt)
         aspect = bw / max(bh, 1)
 
-        # Count holes (internal contours)
         contours_all, hierarchy = cv2.findContours(
             binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         holes = 0
         if hierarchy is not None:
-            for i, h in enumerate(hierarchy[0]):
-                if h[3] >= 0:  # has parent = is a hole
+            for i, h_val in enumerate(hierarchy[0]):
+                if h_val[3] >= 0:
                     holes += 1
 
-        # Simple rules (not perfect, but helps)
-        # 0: wide, 1 hole; 1: narrow; 8: 2 holes; etc.
         if holes >= 2:
             return ("8", 0.5)
         elif holes == 1:
@@ -227,11 +261,8 @@ class OCREngine:
         if char_type == "numeric":
             return self.recognize_digit(box_img)
 
-        # For alpha, use template matching (basic version)
         if box_img.size == 0 or self.is_empty_box(box_img):
             return CharacterResult("", 0.0)
-
-        templates = self._create_alpha_templates()
 
         binary = cv2.adaptiveThreshold(
             box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -242,7 +273,7 @@ class OCREngine:
         best_match = ""
         best_score = 0.0
 
-        for char, template in templates.items():
+        for char, template in self.alpha_templates.items():
             result = cv2.matchTemplate(resized, template, cv2.TM_CCOEFF_NORMED)
             score = float(np.max(result))
             if score > best_score:
@@ -255,11 +286,14 @@ class OCREngine:
     def read_field(self, warped_gray: np.ndarray,
                    field_name: str) -> FieldResult:
         """Read an entire field (name, surname, or student_no)."""
-        if field_name not in CHAR_BOX_CONFIG:
-            return FieldResult(text="", needs_review=True)
+        field_type_map = {
+            "name": "alpha",
+            "surname": "alpha",
+            "student_no": "numeric",
+        }
 
-        config = CHAR_BOX_CONFIG[field_name]
-        boxes = self.extract_box_images(warped_gray, config)
+        char_type = field_type_map.get(field_name, "alpha")
+        boxes = self.extract_box_images(warped_gray, field_name)
 
         characters = []
         char_confidences = []
@@ -268,10 +302,17 @@ class OCREngine:
 
         for i, box_img in enumerate(boxes):
             if self.is_empty_box(box_img):
-                # Stop at first empty box (trailing spaces)
-                break
+                # Check if remaining boxes are also empty (trailing)
+                remaining = boxes[i:]
+                all_empty = all(self.is_empty_box(b) for b in remaining)
+                if all_empty:
+                    break
+                # Not trailing - could be a space
+                text += " "
+                char_confidences.append(1.0)
+                continue
 
-            result = self.recognize_character(box_img, config["type"])
+            result = self.recognize_character(box_img, char_type)
             characters.append(result)
             char_confidences.append(result.confidence)
             text += result.character
@@ -282,7 +323,7 @@ class OCREngine:
         avg_conf = sum(char_confidences) / max(len(char_confidences), 1)
 
         return FieldResult(
-            text=text,
+            text=text.strip(),
             characters=characters,
             avg_confidence=avg_conf,
             needs_review=needs_review,
