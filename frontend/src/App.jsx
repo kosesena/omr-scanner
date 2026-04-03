@@ -152,17 +152,21 @@ function SetupPage({ session, setSession, setPage }) {
   };
 
   const downloadForm = async () => {
+    if (!courseCode.trim()) {
+      alert("Lütfen önce ders kodunu girin (örn. MAT101)");
+      return;
+    }
     setFormLoading(true);
     try {
       const optLabels = allOptions.slice(0, numOpts);
       const res = await axios.get(`${API}/api/forms/download/${numQ}`, {
-        params: { options: optLabels.join(","), show_booklet: useBooklet },
+        params: { options: optLabels.join(","), show_booklet: useBooklet, course_code: courseCode.trim() },
         responseType: "blob",
       });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `optik_form_${numQ}q.pdf`;
+      a.download = `optik_form_${courseCode.trim()}_${numQ}q.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -296,12 +300,21 @@ function SetupPage({ session, setSession, setPage }) {
           <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
             <button
               onClick={downloadForm}
-              disabled={formLoading}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg active:bg-blue-100 transition-colors"
+              disabled={formLoading || !courseCode.trim()}
+              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                !courseCode.trim()
+                  ? "text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
+                  : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 active:bg-blue-100"
+              }`}
             >
               <Download className="w-4 h-4" />
               {formLoading ? "İndiriliyor..." : "Yazdırılabilir Optik Form İndir (PDF)"}
             </button>
+            {!courseCode.trim() && (
+              <p className="text-xs text-amber-500 dark:text-amber-400 mt-1.5 ml-1">
+                Form indirmek için yukarıdan ders kodunu girin.
+              </p>
+            )}
             <p className="text-xs text-slate-400 mt-1.5 ml-1">
               Formu A4 kağıda yazdırın ve öğrencilere dağıtın. Form üzerinde ArUco işaretleri, QR kod ve cevap balonları bulunur.
             </p>

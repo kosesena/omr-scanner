@@ -100,7 +100,7 @@ def generate_form(req: FormGenerateRequest):
 
 @app.get("/api/forms/download/{num_questions}")
 def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E",
-                          show_booklet: bool = True):
+                          show_booklet: bool = True, course_code: str = ""):
     """Download a default form."""
     if num_questions not in [20, 40]:
         raise HTTPException(400, "Supported: 20, 40 questions")
@@ -109,9 +109,11 @@ def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E",
     if not opt_list:
         opt_list = ["A", "B", "C", "D", "E"]
 
+    code = course_code.strip()
     num_opts = len(opt_list)
     bk_suffix = "_nobk" if not show_booklet else ""
-    filepath = os.path.join(FORMS_DIR, f"default_v4_{num_questions}q_{num_opts}opt{bk_suffix}.pdf")
+    code_suffix = f"_{code}" if code else ""
+    filepath = os.path.join(FORMS_DIR, f"default_v4_{num_questions}q_{num_opts}opt{bk_suffix}{code_suffix}.pdf")
     # Always regenerate to pick up latest design changes
     generate_form_pdf(
         num_questions=num_questions,
@@ -119,9 +121,11 @@ def download_default_form(num_questions: int = 40, options: str = "A,B,C,D,E",
         options=opt_list,
         output_path=filepath,
         show_booklet=show_booklet,
+        course_code=code,
     )
+    fname = f"optik_form_{code}_{num_questions}q.pdf" if code else f"optik_form_{num_questions}q.pdf"
     return FileResponse(filepath, media_type="application/pdf",
-                        filename=f"optik_form_{num_questions}q.pdf")
+                        filename=fname)
 
 
 # =====================
