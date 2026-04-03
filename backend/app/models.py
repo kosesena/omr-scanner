@@ -10,6 +10,8 @@ class AnswerKeyRequest(BaseModel):
     answers_b: Optional[dict] = None  # Booklet B answer key
     use_booklet: bool = False
     num_questions: int = Field(40, ge=1, le=200)
+    course_code: str = Field("", max_length=30)
+    num_options: int = Field(5, ge=2, le=5)
 
 
 class FormGenerateRequest(BaseModel):
@@ -84,6 +86,7 @@ class ExamSession(BaseModel):
     answer_key_b: Optional[dict] = None  # Booklet B
     use_booklet: bool = False
     num_questions: int
+    num_options: int = 5
     results: list[ScanResponse] = []
     # New fields
     exam_id: Optional[str] = None

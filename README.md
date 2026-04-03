@@ -18,6 +18,8 @@ Sinav kagitlarini telefon kamerasiyla tarayan, optik formu okuyan, el yazisi kar
 - **Manuel Dogrulama** — Dusuk guvenli OCR sonuclarini ogretmenin duzenleyebildigi dogrulama ekrani
 - **Otomatik Notlandirma** — Cevap anahtarina gore aninda puanlama
 - **Istatistikler** — Sinif ortalamasi, puan dagilimi, soru bazli analiz
+- **Kalici Depolama** — Sinav oturumlari, sinif listeleri ve sonuclar SQLite ile kaydedilir; sunucu yeniden baslatilsa bile veriler korunur
+- **Kayitli Sinavlara Devam** — Daha once olusturulan sinavlara tek tikla devam etme
 - **CSV Disari Aktarma** — Tum sonuclari indirme
 
 ## Mimari
@@ -182,6 +184,7 @@ omr-scanner/
 │   │   ├── ocr_engine.py       # Karakter tanima motoru
 │   │   ├── qr_reader.py        # QR kod okuyucu
 │   │   ├── form_generator.py   # PDF form olusturucu
+│   │   ├── storage.py          # SQLite kalici depolama
 │   │   └── models.py           # Pydantic semalari
 │   ├── requirements.txt
 │   └── Dockerfile

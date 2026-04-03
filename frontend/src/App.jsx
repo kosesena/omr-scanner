@@ -36,7 +36,7 @@ function Header({ page, setPage, session }) {
           </h1>
           {session && (
             <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-              {session.num_questions}S
+              {session.course_code ? `${session.course_code} · ` : ""}{session.num_questions}S
             </span>
           )}
         </div>
@@ -128,6 +128,7 @@ function SetupPage({ session, setSession, setPage }) {
         answers: keysA,
         num_questions: numQ,
         num_options: numOpts,
+        course_code: courseCode,
       };
       if (useBooklet) {
         payload.answers_b = keysB;
@@ -1234,6 +1235,7 @@ function SavedSessionsList({ onResume, onNew }) {
         session: {
           session_id: data.session_id,
           num_questions: data.num_questions,
+          num_options: data.num_options || 5,
           use_booklet: data.use_booklet,
           answer_key: data.answer_key,
           answer_key_b: data.answer_key_b,
@@ -1265,10 +1267,13 @@ function SavedSessionsList({ onResume, onNew }) {
             >
               <div>
                 <span className="text-sm font-medium text-slate-900 dark:text-white">
-                  {s.session_id}
+                  {s.course_code || s.session_id}
                 </span>
+                {s.course_code && (
+                  <span className="text-xs text-slate-400 ml-1">({s.session_id})</span>
+                )}
                 <span className="text-xs text-slate-500 ml-2">
-                  {s.num_questions} soru
+                  {s.num_questions} soru · {s.num_options || 5} şık
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500">

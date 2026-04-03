@@ -138,6 +138,8 @@ def create_session(req: AnswerKeyRequest):
         answer_key_b=req.answers_b,
         use_booklet=req.use_booklet,
         num_questions=req.num_questions,
+        course_code=req.course_code,
+        num_options=req.num_options,
     )
     sessions[session_id] = session
     save_session(session)
@@ -145,6 +147,7 @@ def create_session(req: AnswerKeyRequest):
         "session_id": session_id,
         "num_questions": req.num_questions,
         "use_booklet": req.use_booklet,
+        "course_code": req.course_code,
     }
 
 
@@ -160,7 +163,10 @@ def list_sessions():
     return [
         {
             "session_id": s.session_id,
+            "course_code": s.course_code,
             "num_questions": s.num_questions,
+            "num_options": s.num_options,
+            "use_booklet": s.use_booklet,
             "scanned_count": len(s.results),
             "roster_count": len(s.roster.students),
         }
