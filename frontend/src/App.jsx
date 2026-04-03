@@ -1141,21 +1141,10 @@ function ResultCard({ result, answerKey }) {
       <div className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            {(studentName || studentSurname) ? (
-              <>
-                <p className="text-lg font-bold text-slate-900 dark:text-white">
-                  {studentName} {studentSurname}
-                </p>
-                <p className="text-sm text-slate-500 font-mono">{studentNo}</p>
-              </>
-            ) : (
-              <>
                 <p className="text-sm text-slate-500">Öğrenci No</p>
                 <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">
                   {studentNo || "Tespit edilemedi"}
                 </p>
-              </>
-            )}
           </div>
           {result.score != null && (
             <div className="text-right">
@@ -1281,8 +1270,8 @@ function ReviewPage({ session, results }) {
     try {
       await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
         result_index: reviews[currentIdx]._index,
-        student_name: editName,
-        student_surname: editSurname,
+        student_name: current.student_name?.text || "",
+        student_surname: current.student_surname?.text || "",
         student_number: editNo,
         approved: true,
       });
@@ -1360,46 +1349,6 @@ function ReviewPage({ session, results }) {
       {/* Editable fields */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 space-y-3">
         <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Öğrenci Bilgileri</h3>
-
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-slate-600 w-16">Ad:</label>
-          <input
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value.toUpperCase())}
-            className={cn(
-              "flex-1 px-3 py-2 border rounded-lg text-sm font-mono",
-              current.student_name?.needs_review
-                ? "border-amber-400 bg-amber-50"
-                : "border-slate-200 bg-white"
-            )}
-          />
-          {current.student_name && (
-            <span className="text-xs text-slate-400">
-              %{(current.student_name.confidence * 100).toFixed(0)}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-slate-600 w-16">Soyad:</label>
-          <input
-            type="text"
-            value={editSurname}
-            onChange={(e) => setEditSurname(e.target.value.toUpperCase())}
-            className={cn(
-              "flex-1 px-3 py-2 border rounded-lg text-sm font-mono",
-              current.student_surname?.needs_review
-                ? "border-amber-400 bg-amber-50"
-                : "border-slate-200 bg-white"
-            )}
-          />
-          {current.student_surname && (
-            <span className="text-xs text-slate-400">
-              %{(current.student_surname.confidence * 100).toFixed(0)}
-            </span>
-          )}
-        </div>
 
         <div className="flex items-center gap-3">
           <label className="text-sm text-slate-600 w-16">No:</label>

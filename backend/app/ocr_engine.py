@@ -576,21 +576,13 @@ class OCREngine:
 
     def _read_student_no(self, warped_gray: np.ndarray, boxes: list,
                           filled_info: list, box_pattern: list) -> FieldResult:
-        """Read student number using per-digit Tesseract."""
+        """Read student number using per-digit Tesseract.
+        All 9 boxes are always read (student numbers are always 9 digits)."""
         characters = []
         confidences = []
 
-        for idx, is_filled, ink_score in filled_info:
-            if not is_filled:
-                # Check if all remaining are empty
-                remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
-                if not remaining_filled:
-                    break
-                # Gap shouldn't happen in student number, but handle it
-                characters.append("?")
-                confidences.append(0.0)
-                continue
-
+        # Force-read ALL boxes for student_no (students always fill all 9 digits)
+        for idx in range(len(boxes)):
             cell = self._extract_box(warped_gray, boxes[idx])
             digit, conf = self._read_digit(cell)
             characters.append(digit)
