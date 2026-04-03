@@ -237,28 +237,61 @@ class OMREngine:
         p.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 
     def detect_markers(self, image: np.ndarray) -> dict:
-        """Detect ArUco markers and return their corners."""
+        """Detect ArUco markers with multiple preprocessing attempts."""
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
-        # Try with CLAHE first
+        best_corners, best_ids = None, None
+
+        # Attempt 1: CLAHE enhanced
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
         corners, ids, _ = self.detector.detectMarkers(enhanced)
+        if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
+            best_corners, best_ids = corners, ids
 
-        # Fallback: try on original
-        if ids is None or len(ids) < 4:
-            corners2, ids2, _ = self.detector.detectMarkers(gray)
-            if ids2 is not None and (ids is None or len(ids2) > len(ids)):
-                corners, ids = corners2, ids2
+        # Attempt 2: Original with slight blur
+        if best_ids is None or len(best_ids) < 4:
+            blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+            corners, ids, _ = self.detector.detectMarkers(blurred)
+            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
+                best_corners, best_ids = corners, ids
+
+        # Attempt 3: Shadow-normalized
+        if best_ids is None or len(best_ids) < 4:
+            blur_bg = cv2.GaussianBlur(gray, (101, 101), 0)
+            blur_bg = np.maximum(blur_bg, 1).astype(np.float32)
+            norm = (gray.astype(np.float32) / blur_bg * 180).clip(0, 255).astype(np.uint8)
+            corners, ids, _ = self.detector.detectMarkers(norm)
+            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
+                best_corners, best_ids = corners, ids
+
+        # Attempt 4: Adaptive threshold (binary)
+        if best_ids is None or len(best_ids) < 4:
+            binary = cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 31, 10
+            )
+            corners, ids, _ = self.detector.detectMarkers(binary)
+            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
+                best_corners, best_ids = corners, ids
+
+        # Attempt 5: Stronger CLAHE
+        if best_ids is None or len(best_ids) < 4:
+            clahe2 = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
+            enhanced2 = clahe2.apply(gray)
+            corners, ids, _ = self.detector.detectMarkers(enhanced2)
+            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
+                best_corners, best_ids = corners, ids
 
         markers = {}
-        if ids is not None:
-            for i, mid in enumerate(ids.flatten()):
+        if best_ids is not None:
+            for i, mid in enumerate(best_ids.flatten()):
                 markers[int(mid)] = {
-                    "center": corners[i][0].mean(axis=0),
-                    "corners": corners[i][0],
+                    "center": best_corners[i][0].mean(axis=0),
+                    "corners": best_corners[i][0],
                 }
+
+        logger.info(f"ArUco detection: found {len(markers)} markers: {list(markers.keys())}")
         return markers
 
     def perspective_transform(self, image: np.ndarray, markers: dict) -> Optional[np.ndarray]:
@@ -438,7 +471,11 @@ class OMREngine:
         # Step 1: Detect ArUco markers
         markers = self.detect_markers(image)
         if len(markers) < 4:
-            result.error = f"ArUco marker bulunamadı. Bulunan: {list(markers.keys())}, gereken: [0,1,2,3]"
+            missing = [m for m in [0, 1, 2, 3] if m not in markers]
+            pos_names = {0: "sol üst", 1: "sağ üst", 2: "sol alt", 3: "sağ alt"}
+            missing_str = ", ".join(f"{m} ({pos_names.get(m, '')})" for m in missing)
+            result.error = (f"4 köşe işaretçisinden {4-len(markers)} tanesi bulunamadı: {missing_str}. "
+                           f"Formu düz bir yüzeyde, iyi aydınlatılmış ortamda, tüm köşeler görünecek şekilde çekin.")
             return result
 
         logger.info(f"Found {len(markers)} ArUco markers: {list(markers.keys())}")
