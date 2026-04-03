@@ -67,15 +67,15 @@ function Header({ page, setPage, session }) {
 // ============================================================
 
 function SetupPage({ session, setSession, setPage }) {
-  const [numQ, setNumQ] = useState(40);
-  const [numOpts, setNumOpts] = useState(5);
-  const [useBooklet, setUseBooklet] = useState(false);
+  const [numQ, setNumQ] = useState(session?.num_questions || 40);
+  const [numOpts, setNumOpts] = useState(session?.num_options || 5);
+  const [useBooklet, setUseBooklet] = useState(session?.use_booklet || false);
   const [activeBooklet, setActiveBooklet] = useState("A");
-  const [keysA, setKeysA] = useState({});
-  const [keysB, setKeysB] = useState({});
+  const [keysA, setKeysA] = useState(session?.answer_key || {});
+  const [keysB, setKeysB] = useState(session?.answer_key_b || {});
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [courseCode, setCourseCode] = useState("");
+  const [courseCode, setCourseCode] = useState(session?.course_code || "");
 
   const allOptions = ["A", "B", "C", "D", "E"];
   const options = allOptions.slice(0, numOpts);
@@ -176,6 +176,34 @@ function SetupPage({ session, setSession, setPage }) {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-5">
+
+      {/* Active session banner */}
+      {session && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-5 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              Aktif Sınav: {session.course_code || session.session_id}
+            </p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+              {session.num_questions} soru · {session.num_options || 5} şık · Oturum: {session.session_id}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage("scan")}
+              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors"
+            >
+              Taramaya Git
+            </button>
+            <button
+              onClick={() => { setSession(null); setKeysA({}); setKeysB({}); setCourseCode(""); }}
+              className="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
+            >
+              Yeni Sınav
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: Exam setup */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
