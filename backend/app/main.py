@@ -494,7 +494,7 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
     # Step 4: Encode form image (always save for later review)
     form_image_b64 = None
     if warped is not None:
-        _, buffer = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, 60])
+        _, buffer = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, 85])
         form_image_b64 = base64.b64encode(buffer).decode("utf-8")
 
     response = ScanResponse(

@@ -285,11 +285,16 @@ class OMREngine:
         warped = cv2.warpPerspective(image, M, (WARP_W, WARP_H))
         return warped
 
-    def _sample_bubble(self, thresh: np.ndarray, cx: float, cy: float,
-                       radius: float) -> float:
-        """Sample a single bubble and return its fill ratio."""
-        h, w = thresh.shape[:2]
-        r = max(int(radius), 4)
+    def _sample_bubble_intensity(self, gray: np.ndarray, cx: float, cy: float,
+                                radius: float) -> float:
+        """
+        Sample a bubble's mean intensity from grayscale image.
+        Returns mean intensity (0=black/filled, 255=white/empty).
+        Uses inner ~60% of bubble radius to avoid border artifacts.
+        """
+        h, w = gray.shape[:2]
+        # Use smaller inner radius to avoid the printed circle border
+        r = max(int(radius * 0.6), 3)
         xi, yi = int(round(cx)), int(round(cy))
 
         y1 = max(yi - r, 0)
@@ -298,9 +303,9 @@ class OMREngine:
         x2 = min(xi + r, w)
 
         if y2 <= y1 or x2 <= x1:
-            return 0.0
+            return 255.0
 
-        roi = thresh[y1:y2, x1:x2]
+        roi = gray[y1:y2, x1:x2]
 
         # Circular mask
         mask = np.zeros_like(roi)
@@ -308,81 +313,102 @@ class OMREngine:
         cx_local = xi - x1
         cv2.circle(mask, (cx_local, cy_local), r, 255, -1)
 
-        masked = cv2.bitwise_and(roi, mask)
-        total_pixels = max(np.sum(mask > 0), 1)
-        filled_pixels = np.sum(masked > 0)
+        # Mean intensity of pixels inside the circle
+        pixels = roi[mask > 0]
+        if len(pixels) == 0:
+            return 255.0
 
-        return filled_pixels / total_pixels
+        return float(np.mean(pixels))
 
     def read_answers(self, warped_gray: np.ndarray) -> tuple:
         """
-        Read answers by sampling exact bubble positions.
+        Read answers using intensity-based comparison.
+
+        Instead of thresholding (which picks up printed circle outlines as noise),
+        we compare the mean grayscale intensity of each bubble:
+        - Filled bubble: dark (low intensity, ~50-120)
+        - Empty bubble: light (high intensity, ~180-240)
+
+        For each question, the darkest bubble is the answer IF it's significantly
+        darker than the others.
+
         Returns: (answers_dict, unmarked, multiple_marks, confidence)
         """
-        # Adaptive threshold
-        thresh = cv2.adaptiveThreshold(
-            warped_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 15, 8
-        )
-
         answers = {}
         unmarked = []
         multiple_marks = []
         total_conf = 0.0
         answered = 0
 
-        sample_r = max(self.bubble_r_px * 0.85, 5)
+        sample_r = max(self.bubble_r_px, 5)
 
         for q_num in sorted(self.bubbles.keys()):
-            fill_ratios = []
+            # Get mean intensity for each option
+            intensities = []
             for opt_idx, bx, by in self.bubbles[q_num]:
-                fill = self._sample_bubble(thresh, bx, by, sample_r)
-                fill_ratios.append(fill)
+                intensity = self._sample_bubble_intensity(warped_gray, bx, by, sample_r)
+                intensities.append(intensity)
 
-            fill_ratios = np.array(fill_ratios)
-            max_idx = int(np.argmax(fill_ratios))
-            max_fill = fill_ratios[max_idx]
+            intensities = np.array(intensities)
 
-            # Count significantly filled bubbles
-            filled_count = int(np.sum(fill_ratios > self.fill_threshold))
+            # Sort to find darkest (= most filled)
+            sorted_indices = np.argsort(intensities)  # ascending = darkest first
+            darkest_idx = sorted_indices[0]
+            darkest_val = intensities[darkest_idx]
 
-            if max_fill < self.fill_threshold:
+            # Mean of other (non-darkest) bubbles
+            other_vals = np.delete(intensities, darkest_idx)
+            other_mean = float(np.mean(other_vals))
+
+            # Darkness gap: how much darker is the filled bubble vs unfilled ones
+            # A clearly filled bubble should have a large gap
+            gap = other_mean - darkest_val
+
+            # Also check second darkest
+            second_darkest_val = intensities[sorted_indices[1]]
+            gap_to_second = second_darkest_val - darkest_val
+
+            logger.debug(f"Q{q_num}: intensities={intensities.astype(int).tolist()} "
+                         f"gap={gap:.0f} gap2={gap_to_second:.0f}")
+
+            # Decision logic
+            if gap < 20:
+                # No bubble is significantly darker than others → unmarked
                 unmarked.append(q_num)
                 answers[q_num] = ""
-            elif filled_count > 1:
-                sorted_fills = np.sort(fill_ratios)[::-1]
-                diff = sorted_fills[0] - sorted_fills[1]
-                if diff > self.ambiguity_threshold:
-                    answers[q_num] = self.options[max_idx]
-                    total_conf += max_fill
-                    answered += 1
-                else:
+            elif gap_to_second < 10:
+                # Two bubbles are very close in darkness → multiple marks
+                # But check if both are clearly dark (both filled)
+                if darkest_val < 150 and second_darkest_val < 150:
                     multiple_marks.append(q_num)
                     answers[q_num] = "?"
+                else:
+                    # Just noise, pick the darkest
+                    answers[q_num] = self.options[darkest_idx]
+                    conf = min(gap / 80.0, 1.0)
+                    total_conf += conf
+                    answered += 1
             else:
-                answers[q_num] = self.options[max_idx]
-                total_conf += max_fill
+                # Clear winner
+                answers[q_num] = self.options[darkest_idx]
+                conf = min(gap / 80.0, 1.0)
+                total_conf += conf
                 answered += 1
 
         confidence = total_conf / max(answered, 1)
         return answers, unmarked, multiple_marks, confidence
 
     def read_booklet(self, warped_gray: np.ndarray) -> str:
-        """Read booklet selection (A or B)."""
+        """Read booklet selection (A or B) using intensity comparison."""
         try:
             positions = _compute_booklet_position()
-            thresh = cv2.adaptiveThreshold(
-                warped_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY_INV, 15, 8
-            )
-            r = max(self.bubble_r_px * 0.8, 5)
-            fills = {}
+            r = max(self.bubble_r_px, 5)
+            intensities = {}
             for bk, (bx, by) in positions.items():
-                fills[bk] = self._sample_bubble(thresh, bx, by, r)
+                intensities[bk] = self._sample_bubble_intensity(warped_gray, bx, by, r)
 
-            if fills["A"] > fills["B"] and fills["A"] > 0.25:
-                return "A"
-            elif fills["B"] > fills["A"] and fills["B"] > 0.25:
+            # Darker = filled
+            if intensities["B"] < intensities["A"] - 15:
                 return "B"
             return "A"  # default
         except Exception:
