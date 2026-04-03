@@ -326,40 +326,40 @@ function SetupPage({ session, setSession, setPage }) {
       {/* Step 2: Answer key */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold">2</span>
                 <h2 className="font-semibold text-slate-900 dark:text-white">Cevap Anahtarı</h2>
-                {useBooklet && (
-                  <div className="flex gap-1 ml-2">
-                    {["A", "B"].map((b) => (
-                      <button
-                        key={b}
-                        onClick={() => setActiveBooklet(b)}
-                        className={cn(
-                          "px-3 py-1 rounded-lg text-xs font-bold transition-all",
-                          activeBooklet === b
-                            ? "bg-blue-500 text-white shadow"
-                            : "bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200"
-                        )}
-                      >
-                        Kitapçık {b}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 ml-8">
-                {useBooklet
-                  ? `Her kitapçık için doğru cevapları tek tek işaretleyin. Şu an Kitapçık ${activeBooklet} düzenleniyor.`
-                  : "Her soru için doğru cevabı işaretleyin. Tüm soruların doldurulması zorunludur."
-                }
-              </p>
+              <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline shrink-0">
+                Rastgele doldur (test)
+              </button>
             </div>
-            <button onClick={fillRandom} className="text-xs text-blue-500 hover:underline shrink-0">
-              Rastgele doldur (test)
-            </button>
+            {useBooklet && (
+              <div className="flex gap-1 ml-8">
+                {["A", "B"].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setActiveBooklet(b)}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                      activeBooklet === b
+                        ? "bg-blue-500 text-white shadow"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200"
+                    )}
+                  >
+                    Kitapçık {b}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-slate-500 dark:text-slate-400 ml-8">
+              {useBooklet
+                ? `Her kitapçık için doğru cevapları tek tek işaretleyin. Şu an Kitapçık ${activeBooklet} düzenleniyor.`
+                : "Her soru için doğru cevabı işaretleyin. Tüm soruların doldurulması zorunludur."
+              }
+            </p>
           </div>
         </div>
 
