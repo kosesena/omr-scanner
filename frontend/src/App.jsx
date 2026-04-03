@@ -856,40 +856,54 @@ function ScanPage({ session, setSession, setResults, results }) {
   }, [session]);
 
   const _ensureSession = async () => {
-    /* Make sure backend has this session (with roster). If not, recreate. */
+    /* Make sure backend is awake and session exists. Retry-friendly. */
     if (!session?.session_id) return session;
-    try {
-      await axios.get(`${API}/api/sessions/${session.session_id}`);
-      return session; // exists
-    } catch {
-      // Session gone — recreate
+
+    // First: wake up the backend with a lightweight ping (retry up to 2 times)
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const payload = {
-          answers: session.answer_key,
-          num_questions: session.num_questions || 40,
-          num_options: session.num_options || 5,
-          course_code: session.course_code || "",
-        };
-        if (session.use_booklet && session.answer_key_b) {
-          payload.answers_b = session.answer_key_b;
-          payload.use_booklet = true;
+        await axios.get(`${API}/api/sessions/${session.session_id}`, { timeout: 30000 });
+        return session; // exists and backend is awake
+      } catch (e) {
+        if (e.response?.status === 404) {
+          // Session gone — recreate below
+          break;
         }
-        const res = await axios.post(`${API}/api/sessions/create`, payload);
-        const newSession = { ...session, session_id: res.data.session_id };
-
-        // Re-upload roster
-        const roster = session._roster || [];
-        if (roster.length > 0) {
-          try {
-            await axios.post(`${API}/api/sessions/${res.data.session_id}/roster`, { students: roster });
-          } catch { /* ignore */ }
+        // Network error / timeout — backend still waking up, retry
+        if (attempt === 0) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
         }
-
-        setSession(newSession);
-        return newSession;
-      } catch {
-        return session;
       }
+    }
+
+    // Session not found or backend just woke up — recreate session
+    try {
+      const payload = {
+        answers: session.answer_key,
+        num_questions: session.num_questions || 40,
+        num_options: session.num_options || 5,
+        course_code: session.course_code || "",
+      };
+      if (session.use_booklet && session.answer_key_b) {
+        payload.answers_b = session.answer_key_b;
+        payload.use_booklet = true;
+      }
+      const res = await axios.post(`${API}/api/sessions/create`, payload, { timeout: 30000 });
+      const newSession = { ...session, session_id: res.data.session_id };
+
+      // Re-upload roster
+      const roster = session._roster || [];
+      if (roster.length > 0) {
+        try {
+          await axios.post(`${API}/api/sessions/${res.data.session_id}/roster`, { students: roster }, { timeout: 15000 });
+        } catch { /* ignore */ }
+      }
+
+      setSession(newSession);
+      return newSession;
+    } catch {
+      return session; // fallback: use old session_id, scan might still work without session
     }
   };
 
@@ -908,8 +922,10 @@ function ScanPage({ session, setSession, setResults, results }) {
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
       const msg = e.response?.data?.detail || e.message;
-      const hint = e.code === "ECONNABORTED" ? " (Zaman aşımı — tekrar deneyin)" : "";
-      setLastResult({ success: false, error: msg + hint });
+      let hint = "";
+      if (e.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
+      else if (e.code === "ERR_NETWORK" || !e.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
+      setLastResult({ success: false, error: "Tarama başarısız: " + msg + hint });
     }
     setScanning(false);
   };
@@ -931,8 +947,10 @@ function ScanPage({ session, setSession, setResults, results }) {
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
       const msg = e.response?.data?.detail || e.message;
-      const hint = e.code === "ECONNABORTED" ? " (Zaman aşımı — tekrar deneyin)" : "";
-      setLastResult({ success: false, error: msg + hint });
+      let hint = "";
+      if (e.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
+      else if (e.code === "ERR_NETWORK" || !e.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
+      setLastResult({ success: false, error: "Tarama başarısız: " + msg + hint });
     }
     setScanning(false);
     e.target.value = "";
