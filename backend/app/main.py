@@ -456,7 +456,8 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
 
     # Step 3: OCR - read character boxes
     ocr = OCREngine()
-    warped = engine.last_warped_gray  # get from engine after scan
+    # Use raw (non-CLAHE) grayscale for OCR — CLAHE amplifies paper texture noise
+    warped = engine.last_warped_gray_raw or engine.last_warped_gray
 
     student_name_result = None
     student_surname_result = None
@@ -493,8 +494,9 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
 
     # Step 4: Encode form image (always save for later review)
     form_image_b64 = None
-    if warped is not None:
-        _, buffer = cv2.imencode(".png", warped)
+    warped_color = engine.last_warped  # color version for display
+    if warped_color is not None:
+        _, buffer = cv2.imencode(".jpg", warped_color, [cv2.IMWRITE_JPEG_QUALITY, 92])
         form_image_b64 = base64.b64encode(buffer).decode("utf-8")
 
     response = ScanResponse(

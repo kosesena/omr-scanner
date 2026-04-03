@@ -214,7 +214,8 @@ class OMREngine:
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
 
         self.last_warped = None
-        self.last_warped_gray = None
+        self.last_warped_gray = None      # CLAHE-enhanced (for bubble reading)
+        self.last_warped_gray_raw = None  # Raw grayscale (for OCR)
 
         # Pre-compute bubble positions
         self.bubbles, self.bubble_r_px = _compute_bubble_positions(
@@ -449,17 +450,18 @@ class OMREngine:
 
         # Convert to grayscale
         if len(warped.shape) == 3:
-            warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+            warped_gray_raw = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
         else:
-            warped_gray = warped.copy()
+            warped_gray_raw = warped.copy()
 
-        # Enhance contrast
+        # CLAHE for bubble reading (enhances contrast for filled detection)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        warped_gray = clahe.apply(warped_gray)
+        warped_gray = clahe.apply(warped_gray_raw)
 
-        # Store for OCR engine
+        # Store both versions
         self.last_warped = warped
-        self.last_warped_gray = warped_gray
+        self.last_warped_gray = warped_gray          # CLAHE (for bubbles)
+        self.last_warped_gray_raw = warped_gray_raw  # Raw (for OCR)
 
         # Step 3: Read answers (exact positions)
         answers, unmarked, multi, confidence = self.read_answers(warped_gray)

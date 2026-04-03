@@ -696,26 +696,27 @@ function RosterPage({ session, setPage }) {
 // Scan Step (animated reveal)
 // ============================================================
 
-function ScanStep({ label, delay }) {
+function ScanStep({ label, delay, active }) {
   const [visible, setVisible] = useState(false);
+  const [done, setDone] = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
+    if (!active) { setVisible(false); setDone(false); return; }
+    const showTimer = setTimeout(() => setVisible(true), delay);
+    const doneTimer = setTimeout(() => setDone(true), delay + 1200);
+    return () => { clearTimeout(showTimer); clearTimeout(doneTimer); };
+  }, [delay, active]);
+
+  if (!visible) return null;
 
   return (
-    <div
-      className={cn(
-        "flex items-center justify-center gap-2 transition-all duration-500",
-        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-      )}
-    >
-      {visible ? (
-        <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    <div className="flex items-center justify-center gap-2.5 animate-fade-in">
+      {done ? (
+        <CheckCircle className="w-4 h-4 text-green-500" />
       ) : (
-        <div className="w-3.5 h-3.5" />
+        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
       )}
-      <span>{label}</span>
+      <span className={done ? "text-green-600 dark:text-green-400" : "text-slate-500"}>{label}</span>
     </div>
   );
 }
@@ -892,31 +893,22 @@ function ScanPage({ session, setResults, results }) {
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 text-center space-y-5 shadow-lg">
           {/* Animated scanner icon */}
           <div className="relative w-20 h-20 mx-auto">
-            {/* Outer ring - spinning */}
-            <div className="absolute inset-0 border-4 border-blue-200 dark:border-blue-800 rounded-full" />
-            <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
-            {/* Inner icon - pulsing */}
+            <div className="absolute inset-0 border-4 border-blue-100 dark:border-blue-900 rounded-full" />
+            <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" style={{ animationDuration: "1.2s" }} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Scan className="w-8 h-8 text-blue-500 animate-pulse" />
+              <Scan className="w-8 h-8 text-blue-500" />
             </div>
           </div>
 
-          {/* Status text with steps */}
-          <div className="space-y-2">
-            <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
-              Optik form okunuyor...
-            </p>
-            <div className="flex flex-col gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <ScanStep label="Form algılanıyor" delay={0} />
-              <ScanStep label="Perspektif düzeltiliyor" delay={800} />
-              <ScanStep label="Cevaplar okunuyor" delay={1600} />
-              <ScanStep label="Puanlama yapılıyor" delay={2400} />
-            </div>
-          </div>
+          <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
+            Optik form okunuyor...
+          </p>
 
-          {/* Progress bar */}
-          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full animate-scan-progress" />
+          <div className="flex flex-col gap-2 text-sm">
+            <ScanStep label="Form algılanıyor" delay={0} active={scanning} />
+            <ScanStep label="Perspektif düzeltiliyor" delay={1500} active={scanning} />
+            <ScanStep label="Cevaplar okunuyor" delay={3000} active={scanning} />
+            <ScanStep label="Puanlama yapılıyor" delay={4500} active={scanning} />
           </div>
         </div>
       )}

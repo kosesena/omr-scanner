@@ -120,7 +120,7 @@ class OCREngine:
     """Handwriting recognition engine for character boxes."""
 
     def __init__(self):
-        self.empty_threshold = 0.03
+        self.empty_threshold = 0.08  # higher threshold to ignore box border artifacts
         self.digit_templates = self._create_digit_templates()
         self.alpha_templates = self._create_alpha_templates()
 
@@ -180,10 +180,28 @@ class OCREngine:
         return boxes
 
     def is_empty_box(self, box_img: np.ndarray) -> bool:
-        """Check if a box is empty (no writing)."""
+        """
+        Check if a box is empty (no writing).
+        Uses both intensity check and threshold fill ratio.
+        An empty box has high mean intensity (light) and low fill.
+        A written box has significant dark regions.
+        """
         if box_img.size == 0:
             return True
 
+        # Method 1: Mean intensity — empty boxes are bright (>180)
+        mean_val = float(np.mean(box_img))
+        if mean_val > 190:
+            return True
+
+        # Method 2: Check how many truly dark pixels exist
+        # Handwriting creates pixels < 120, box borders are lighter
+        dark_pixels = np.sum(box_img < 120)
+        dark_ratio = dark_pixels / box_img.size
+        if dark_ratio < 0.04:
+            return True
+
+        # Method 3: Adaptive threshold fill ratio
         binary = cv2.adaptiveThreshold(
             box_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY_INV, 11, 5
