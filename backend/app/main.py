@@ -580,7 +580,7 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
                                 matched_number = sno
                                 break
 
-                # 3. Fuzzy match — allow up to 2 wrong digits
+                # 3. Fuzzy match — allow only 1 wrong digit for safety
                 if not roster_name:
                     best_match = None
                     best_diff = 99
@@ -593,13 +593,12 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
                             best_diff = diff
                             best_match = s
 
-                    # Accept fuzzy match only if unique with <= 2 differences
-                    if best_match and best_diff <= 2:
-                        # Check uniqueness: no other student with same diff count
+                    # Accept fuzzy match only if unique with exactly 1 difference
+                    if best_match and best_diff == 1:
                         same_diff_count = sum(
                             1 for s in sess.roster.students
                             if len(s.student_number.strip()) == len(ocr_no)
-                            and sum(1 for a, b in zip(ocr_no, s.student_number.strip()) if a != "?" and a != b) == best_diff
+                            and sum(1 for a, b in zip(ocr_no, s.student_number.strip()) if a != "?" and a != b) == 1
                         )
                         if same_diff_count == 1:
                             roster_name = best_match.name
