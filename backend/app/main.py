@@ -547,22 +547,57 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
         number_field = ocr.read_field(warped, "student_no")
         # Pass partial student_no to help name matching
         if number_field.text and number_field.text != "?":
-            # Re-read name/surname with student_no hint for better roster matching
             ocr._last_student_no = number_field.text
         name_field = ocr.read_field(warped, "name")
         surname_field = ocr.read_field(warped, "surname")
 
+        # If we have a roster and the student number matched, use roster name/surname
+        roster_name = ""
+        roster_surname = ""
+        if session_id and session_id in sessions:
+            sess = sessions[session_id]
+            if sess.roster and sess.roster.students and number_field.text:
+                student_no = number_field.text.replace("?", "")
+                for s in sess.roster.students:
+                    if s.student_number == number_field.text:
+                        # Exact match
+                        roster_name = s.name
+                        roster_surname = s.surname
+                        break
+                if not roster_name:
+                    # Try partial match (with ? wildcards)
+                    for s in sess.roster.students:
+                        sno = s.student_number.strip()
+                        if len(sno) == len(number_field.text):
+                            match = True
+                            for a, b in zip(number_field.text, sno):
+                                if a != "?" and a != b:
+                                    match = False
+                                    break
+                            if match:
+                                roster_name = s.name
+                                roster_surname = s.surname
+                                # Also fix the student number
+                                number_field.text = sno
+                                number_field.avg_confidence = max(number_field.avg_confidence, 0.7)
+                                break
+
+        final_name = roster_name if roster_name else name_field.text
+        final_surname = roster_surname if roster_surname else surname_field.text
+        name_conf = 0.95 if roster_name else name_field.avg_confidence
+        surname_conf = 0.95 if roster_surname else surname_field.avg_confidence
+
         student_name_result = CharFieldResult(
-            text=name_field.text,
-            confidence=name_field.avg_confidence,
-            needs_review=name_field.needs_review,
-            char_confidences=name_field.char_confidences,
+            text=final_name,
+            confidence=name_conf,
+            needs_review=not roster_name and name_field.needs_review,
+            char_confidences=[name_conf] * max(len(final_name), 1),
         )
         student_surname_result = CharFieldResult(
-            text=surname_field.text,
-            confidence=surname_field.avg_confidence,
-            needs_review=surname_field.needs_review,
-            char_confidences=surname_field.char_confidences,
+            text=final_surname,
+            confidence=surname_conf,
+            needs_review=not roster_surname and surname_field.needs_review,
+            char_confidences=[surname_conf] * max(len(final_surname), 1),
         )
         student_number_result = CharFieldResult(
             text=number_field.text,
@@ -571,8 +606,8 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
             char_confidences=number_field.char_confidences,
         )
 
-        needs_review = (name_field.needs_review or
-                        surname_field.needs_review or
+        needs_review = (student_name_result.needs_review or
+                        student_surname_result.needs_review or
                         number_field.needs_review)
 
     # Step 4: Encode form image (always save for later review)
