@@ -699,10 +699,12 @@ function RosterPage({ session, setPage }) {
 function ScanPage({ session, setResults, results }) {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const cameraFileRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [useCamera, setUseCamera] = useState(true);
   const [facingMode, setFacingMode] = useState("environment");
+  const [cameraError, setCameraError] = useState(false);
 
   const capture = useCallback(async () => {
     if (!webcamRef.current) return;
@@ -764,68 +766,95 @@ function ScanPage({ session, setResults, results }) {
       {/* Camera / Upload toggle */}
       <div className="flex gap-2">
         <button
-          onClick={() => setUseCamera(true)}
+          onClick={() => { setUseCamera(true); setCameraError(false); }}
           className={cn(
-            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
-            useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600"
+            "flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+            useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
           )}
         >
-          <Camera className="w-4 h-4" /> Kamera
+          <Camera className="w-4 h-4" /> Fotoğraf Çek
         </button>
         <button
           onClick={() => setUseCamera(false)}
           className={cn(
-            "flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
-            !useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600"
+            "flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+            !useCamera ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
           )}
         >
-          <Upload className="w-4 h-4" /> Yükle
+          <Upload className="w-4 h-4" /> Galeriden Seç
         </button>
       </div>
 
       {/* Camera */}
       {useCamera ? (
-        <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4]">
-          <Webcam
-            ref={webcamRef}
-            audio={false}
-            screenshotFormat="image/jpeg"
-            screenshotQuality={0.95}
-            videoConstraints={{ facingMode, width: { ideal: 1920 }, height: { ideal: 2560 } }}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-8 border-2 border-white/30 rounded-lg" />
-          </div>
-          <div className="absolute bottom-4 inset-x-4 flex items-center justify-center gap-4">
+        cameraError ? (
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-8 text-center space-y-4">
+            <Camera className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600" />
+            <div>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Kamera erişimi sağlanamadı</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Mobilde kamera için HTTPS gereklidir. Bunun yerine aşağıdaki butonla telefon kamerasını açarak fotoğraf çekebilirsiniz.
+              </p>
+            </div>
             <button
-              onClick={() => setFacingMode(f => f === "environment" ? "user" : "environment")}
-              className="p-3 bg-white/20 backdrop-blur rounded-full text-white"
+              onClick={() => cameraFileRef.current?.click()}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-blue-500 text-white rounded-lg font-medium text-sm active:scale-95 transition-transform"
             >
-              <RotateCcw className="w-5 h-5" />
+              <Camera className="w-5 h-5" /> Kamerayı Aç ve Fotoğraf Çek
             </button>
+            <input ref={cameraFileRef} type="file" accept="image/*" capture="environment"
+              onChange={handleFileUpload} className="hidden" />
             <button
-              onClick={capture}
-              disabled={scanning}
-              className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center disabled:opacity-50"
+              onClick={() => { setUseCamera(false); }}
+              className="block mx-auto text-xs text-slate-400 underline mt-2"
             >
-              {scanning ? (
-                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <div className="w-12 h-12 bg-blue-500 rounded-full" />
-              )}
+              veya galeriden fotoğraf seç
             </button>
-            <div className="w-11" />
           </div>
-        </div>
+        ) : (
+          <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4]">
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.95}
+              videoConstraints={{ facingMode, width: { ideal: 1920 }, height: { ideal: 2560 } }}
+              className="w-full h-full object-cover"
+              onUserMediaError={() => setCameraError(true)}
+            />
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-8 border-2 border-white/30 rounded-lg" />
+            </div>
+            <div className="absolute bottom-4 inset-x-4 flex items-center justify-center gap-4">
+              <button
+                onClick={() => setFacingMode(f => f === "environment" ? "user" : "environment")}
+                className="p-3 bg-white/20 backdrop-blur rounded-full text-white"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+              <button
+                onClick={capture}
+                disabled={scanning}
+                className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center disabled:opacity-50"
+              >
+                {scanning ? (
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <div className="w-12 h-12 bg-blue-500 rounded-full" />
+                )}
+              </button>
+              <div className="w-11" />
+            </div>
+          </div>
+        )
       ) : (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400"
+          className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-12 text-center cursor-pointer hover:border-blue-400 active:bg-slate-50 dark:active:bg-slate-800 transition-colors"
         >
           <Upload className="w-10 h-10 mx-auto mb-3 text-slate-400" />
-          <p className="text-sm text-slate-500">Optik form fotoğrafı seçin</p>
-          <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+          <p className="text-sm text-slate-500">Galeriden optik form fotoğrafı seçin</p>
+          <input ref={fileInputRef} type="file" accept="image/*"
             onChange={handleFileUpload} className="hidden" />
         </div>
       )}
