@@ -703,57 +703,27 @@ function ScanningOverlay() {
     "Cevaplar okunuyor",
     "Puanlama yapılıyor",
   ];
-  const [currentStep, setCurrentStep] = useState(0);
+  const [step, setStep] = useState(0);
 
   useEffect(() => {
-    if (currentStep >= steps.length) return;
-    const timer = setTimeout(() => setCurrentStep((s) => s + 1), 2000);
-    return () => clearTimeout(timer);
-  }, [currentStep, steps.length]);
-
-  const activeLabel = currentStep < steps.length ? steps[currentStep] : steps[steps.length - 1];
+    const interval = setInterval(() => {
+      setStep((s) => (s + 1) % steps.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 text-center space-y-6 shadow-lg">
-      {/* Spinner */}
-      <div className="relative w-20 h-20 mx-auto">
-        <div className="absolute inset-0 border-4 border-blue-100 dark:border-blue-900 rounded-full" />
-        <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" style={{ animationDuration: "1.2s" }} />
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 py-12 px-8 text-center shadow-lg">
+      <div className="relative w-16 h-16 mx-auto mb-6">
+        <div className="absolute inset-0 border-[3px] border-blue-100 dark:border-blue-900 rounded-full" />
+        <div className="absolute inset-0 border-[3px] border-transparent border-t-blue-500 rounded-full animate-spin" style={{ animationDuration: "1s" }} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <Scan className="w-8 h-8 text-blue-500" />
+          <Scan className="w-7 h-7 text-blue-500" />
         </div>
       </div>
-
-      <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
-        Optik form okunuyor...
+      <p key={step} className="text-sm font-medium text-blue-600 dark:text-blue-400 animate-fade-in">
+        {steps[step]}...
       </p>
-
-      {/* Single active step */}
-      <div className="h-8 flex items-center justify-center">
-        <div key={activeLabel} className="flex items-center gap-2.5 animate-fade-in text-sm">
-          {currentStep < steps.length ? (
-            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <CheckCircle className="w-4 h-4 text-green-500" />
-          )}
-          <span className="text-blue-600 dark:text-blue-400 font-medium">{activeLabel}</span>
-        </div>
-      </div>
-
-      {/* Step dots */}
-      <div className="flex items-center justify-center gap-2">
-        {steps.map((_, i) => (
-          <div
-            key={i}
-            className={cn(
-              "w-2 h-2 rounded-full transition-all duration-300",
-              i < currentStep ? "bg-green-400 scale-100" :
-              i === currentStep ? "bg-blue-500 scale-125" :
-              "bg-slate-200 dark:bg-slate-600"
-            )}
-          />
-        ))}
-      </div>
     </div>
   );
 }

@@ -423,6 +423,20 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
                   answer_key_b: dict = None, use_booklet: bool = False,
                   num_options: int = 5) -> ScanResponse:
     """Core scan processing pipeline."""
+    try:
+        return _process_scan_inner(image, answer_key, session_id,
+                                    num_questions, answer_key_b, use_booklet, num_options)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return ScanResponse(success=False, error=f"Sunucu hatası: {str(e)}")
+
+
+def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
+                        session_id: str = None, num_questions: int = 40,
+                        answer_key_b: dict = None, use_booklet: bool = False,
+                        num_options: int = 5) -> ScanResponse:
+    """Inner scan pipeline — errors caught by _process_scan wrapper."""
 
     # Step 1: Read QR code from raw image
     qr_data = read_qr_from_image(image)
