@@ -373,11 +373,11 @@ class OMREngine:
                          f"gap={gap:.0f} gap2={gap_to_second:.0f}")
 
             # Decision logic
-            if gap < 12:
+            if gap < 8:
                 # No bubble is significantly darker than others → unmarked
                 unmarked.append(q_num)
                 answers[q_num] = ""
-            elif gap_to_second < 8:
+            elif gap_to_second < 6:
                 # Two bubbles are very close in darkness → multiple marks
                 # But check if both are clearly dark (both filled)
                 if darkest_val < 150 and second_darkest_val < 150:
@@ -454,15 +454,15 @@ class OMREngine:
         else:
             warped_gray_raw = warped.copy()
 
-        # Normalize to reduce shadow effects, then CLAHE for contrast
-        # Gaussian blur large kernel to estimate lighting, then divide out
-        blur = cv2.GaussianBlur(warped_gray_raw, (51, 51), 0)
-        # Avoid division by zero
+        # Shadow removal: estimate local lighting with large blur, then normalize
+        # This makes bubbles look the same whether in shadow or not
+        blur = cv2.GaussianBlur(warped_gray_raw, (101, 101), 0)
         blur = np.maximum(blur, 1).astype(np.float32)
-        normalized = (warped_gray_raw.astype(np.float32) / blur * 128).clip(0, 255).astype(np.uint8)
+        # Divide by local mean → flat lighting; multiply by 200 to get nice range
+        normalized = (warped_gray_raw.astype(np.float32) / blur * 200).clip(0, 255).astype(np.uint8)
 
-        # CLAHE for bubble reading (enhances contrast for filled detection)
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        # CLAHE for bubble reading
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         warped_gray = clahe.apply(normalized)
 
         # Store both versions

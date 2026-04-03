@@ -169,6 +169,9 @@ class OCREngine:
 
         Strategy: measure mean intensity per box. Empty boxes are bright
         (~190-230), filled boxes are dark (~80-160). Find the natural gap.
+
+        Special case for student_no: all 9 boxes may be filled, so there's
+        no empty reference. Use absolute threshold instead.
         """
         boxes = CHAR_BOX_POSITIONS.get(field_name, [])
 
@@ -183,41 +186,41 @@ class OCREngine:
         if not scores:
             return []
 
-        # Sort scores to find natural gap between "empty" and "filled"
         sorted_scores = sorted(scores)
 
-        # The highest scores are definitely empty boxes.
-        # Use top 25% of boxes as "empty reference" (at least for name/surname,
-        # most boxes are empty: 20 boxes but name is max ~12 chars)
-        n_empty_ref = max(len(scores) // 4, 3)
-        empty_mean = float(np.mean(sorted_scores[-n_empty_ref:]))
-
-        # A box is "filled" if it's significantly darker than the empty reference.
-        # Threshold: at least 30 intensity units darker than empty mean.
-        threshold = empty_mean - 30
-
-        # Find natural gap if it exists (largest gap in sorted scores)
+        # Find natural gap (largest intensity jump between consecutive sorted scores)
         max_gap = 0
-        gap_threshold = threshold
+        gap_threshold = 180
         for i in range(len(sorted_scores) - 1):
             gap = sorted_scores[i + 1] - sorted_scores[i]
             if gap > max_gap:
                 max_gap = gap
                 gap_threshold = (sorted_scores[i] + sorted_scores[i + 1]) / 2
 
-        # Use the gap-based threshold if the gap is significant (>20)
         if max_gap > 20:
+            # Clear gap between filled and empty groups — use it
             threshold = gap_threshold
+        else:
+            # No clear gap — either ALL filled or ALL empty
+            # Use absolute threshold: anything below 185 is "filled"
+            # (typical empty box ~195-230, filled ~80-170)
+            lightest = sorted_scores[-1]
+            if lightest < 185:
+                # All boxes are relatively dark → probably all filled (like student_no)
+                threshold = 250  # mark all as filled
+            else:
+                # All boxes are bright → probably all empty
+                threshold = lightest - 25
 
         results = []
         for i, score in enumerate(scores):
-            is_filled = score < threshold  # lower = darker = filled
+            is_filled = score < threshold
             results.append((i, is_filled, score))
 
         filled_indices = [i for i, f, _ in results if f]
         logger.info(f"OCR {field_name}: intensities={[int(s) for s in scores]} "
-                     f"empty_mean={empty_mean:.0f} threshold={threshold:.0f} "
-                     f"max_gap={max_gap:.0f} filled={filled_indices}")
+                     f"max_gap={max_gap:.0f} threshold={threshold:.0f} "
+                     f"filled={filled_indices}")
 
         return results
 
