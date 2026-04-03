@@ -693,6 +693,34 @@ function RosterPage({ session, setPage }) {
 }
 
 // ============================================================
+// Scan Step (animated reveal)
+// ============================================================
+
+function ScanStep({ label, delay }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center gap-2 transition-all duration-500",
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+      )}
+    >
+      {visible ? (
+        <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <div className="w-3.5 h-3.5" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// ============================================================
 // Scan Page
 // ============================================================
 
@@ -859,11 +887,47 @@ function ScanPage({ session, setResults, results }) {
         </div>
       )}
 
-      <div className="text-center text-sm text-slate-500">
-        {results.filter(r => r.success).length} form tarandı
-      </div>
+      {/* Scanning overlay */}
+      {scanning && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 text-center space-y-5 shadow-lg">
+          {/* Animated scanner icon */}
+          <div className="relative w-20 h-20 mx-auto">
+            {/* Outer ring - spinning */}
+            <div className="absolute inset-0 border-4 border-blue-200 dark:border-blue-800 rounded-full" />
+            <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+            {/* Inner icon - pulsing */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Scan className="w-8 h-8 text-blue-500 animate-pulse" />
+            </div>
+          </div>
 
-      {lastResult && <ResultCard result={lastResult} answerKey={session.answer_key} />}
+          {/* Status text with steps */}
+          <div className="space-y-2">
+            <p className="text-base font-semibold text-slate-800 dark:text-slate-200">
+              Optik form okunuyor...
+            </p>
+            <div className="flex flex-col gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <ScanStep label="Form algılanıyor" delay={0} />
+              <ScanStep label="Perspektif düzeltiliyor" delay={800} />
+              <ScanStep label="Cevaplar okunuyor" delay={1600} />
+              <ScanStep label="Puanlama yapılıyor" delay={2400} />
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full animate-scan-progress" />
+          </div>
+        </div>
+      )}
+
+      {!scanning && (
+        <div className="text-center text-sm text-slate-500">
+          {results.filter(r => r.success).length} form tarandı
+        </div>
+      )}
+
+      {!scanning && lastResult && <ResultCard result={lastResult} answerKey={session.answer_key} />}
     </div>
   );
 }
