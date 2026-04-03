@@ -859,19 +859,24 @@ function ScanPage({ session, setSession, setResults, results }) {
     /* Make sure backend is awake and session exists. Retry-friendly. */
     if (!session?.session_id) return session;
 
-    // First: wake up the backend with a lightweight ping (retry up to 2 times)
-    for (let attempt = 0; attempt < 2; attempt++) {
+    // Wake up the backend with a lightweight ping (retry up to 4 times for cold starts)
+    let backendAwake = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await axios.get(`${API}/api/sessions/${session.session_id}`, { timeout: 30000 });
+        await axios.get(`${API}/api/sessions/${session.session_id}`, { timeout: 45000 });
         return session; // exists and backend is awake
       } catch (e) {
         if (e.response?.status === 404) {
-          // Session gone — recreate below
+          backendAwake = true; // got a real response — backend is awake
+          break;
+        }
+        if (e.response) {
+          backendAwake = true; // any HTTP response means backend is awake
           break;
         }
         // Network error / timeout — backend still waking up, retry
-        if (attempt === 0) {
-          await new Promise(r => setTimeout(r, 3000));
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 5000));
           continue;
         }
       }
@@ -889,7 +894,7 @@ function ScanPage({ session, setSession, setResults, results }) {
         payload.answers_b = session.answer_key_b;
         payload.use_booklet = true;
       }
-      const res = await axios.post(`${API}/api/sessions/create`, payload, { timeout: 30000 });
+      const res = await axios.post(`${API}/api/sessions/create`, payload, { timeout: 45000 });
       const newSession = { ...session, session_id: res.data.session_id };
 
       // Re-upload roster
@@ -917,15 +922,28 @@ function ScanPage({ session, setSession, setResults, results }) {
       if (s.session_id) formData.append("session_id", s.session_id);
       if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
-      const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
-      setLastResult(res.data);
-      setResults((prev) => [...prev, res.data]);
-    } catch (e) {
-      const msg = e.response?.data?.detail || e.message;
+      // Retry scan up to 2 times for cold-start network errors
+      let lastErr;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
+          setLastResult(res.data);
+          setResults((prev) => [...prev, res.data]);
+          setScanning(false);
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (err.response) break; // real HTTP error, don't retry
+          if (attempt === 0) await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+      const msg = lastErr.response?.data?.detail || lastErr.message;
       let hint = "";
-      if (e.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
-      else if (e.code === "ERR_NETWORK" || !e.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
+      if (lastErr.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
+      else if (lastErr.code === "ERR_NETWORK" || !lastErr.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
       setLastResult({ success: false, error: "Tarama başarısız: " + msg + hint });
+    } catch (e) {
+      setLastResult({ success: false, error: "Tarama başarısız: " + e.message });
     }
     setScanning(false);
   };
@@ -942,15 +960,29 @@ function ScanPage({ session, setSession, setResults, results }) {
       if (s.session_id) formData.append("session_id", s.session_id);
       if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
-      const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
-      setLastResult(res.data);
-      setResults((prev) => [...prev, res.data]);
-    } catch (e) {
-      const msg = e.response?.data?.detail || e.message;
+      // Retry scan up to 2 times for cold-start network errors
+      let lastErr;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
+          setLastResult(res.data);
+          setResults((prev) => [...prev, res.data]);
+          setScanning(false);
+          e.target.value = "";
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (err.response) break; // real HTTP error, don't retry
+          if (attempt === 0) await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+      const msg = lastErr.response?.data?.detail || lastErr.message;
       let hint = "";
-      if (e.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
-      else if (e.code === "ERR_NETWORK" || !e.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
+      if (lastErr.code === "ECONNABORTED") hint = " (Zaman aşımı — tekrar deneyin)";
+      else if (lastErr.code === "ERR_NETWORK" || !lastErr.response) hint = " (Sunucu uyanıyor olabilir — 10 sn bekleyip tekrar deneyin)";
       setLastResult({ success: false, error: "Tarama başarısız: " + msg + hint });
+    } catch (e) {
+      setLastResult({ success: false, error: "Tarama başarısız: " + e.message });
     }
     setScanning(false);
     e.target.value = "";
