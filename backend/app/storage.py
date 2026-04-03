@@ -1,6 +1,7 @@
 """
 Persistent storage for OMR Scanner using Supabase.
 Falls back to SQLite if Supabase is not configured.
+All session queries are scoped by user_id.
 """
 
 import os
@@ -8,6 +9,7 @@ import json
 import base64
 import sqlite3
 from contextlib import contextmanager
+from typing import Optional
 from app.models import ExamSession
 
 # Supabase config
@@ -56,25 +58,34 @@ def _init_sqlite():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'dev-user',
                 data TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Add user_id column if table already exists without it
+        try:
+            conn.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT NOT NULL DEFAULT 'dev-user'")
+        except Exception:
+            pass  # Column already exists
 
 
-def _save_sqlite(session: ExamSession):
+def _save_sqlite(session: ExamSession, user_id: str):
     with _get_db() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO sessions (session_id, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-            (session.session_id, session.model_dump_json()),
+            "INSERT OR REPLACE INTO sessions (session_id, user_id, data, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            (session.session_id, user_id, session.model_dump_json()),
         )
 
 
-def _load_all_sqlite() -> dict[str, ExamSession]:
+def _load_user_sessions_sqlite(user_id: str) -> dict[str, ExamSession]:
     sessions = {}
     with _get_db() as conn:
-        rows = conn.execute("SELECT session_id, data FROM sessions").fetchall()
+        rows = conn.execute(
+            "SELECT session_id, data FROM sessions WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
     for sid, data in rows:
         try:
             sessions[sid] = ExamSession.model_validate_json(data)
@@ -83,16 +94,33 @@ def _load_all_sqlite() -> dict[str, ExamSession]:
     return sessions
 
 
-def _delete_sqlite(session_id: str):
+def _load_session_sqlite(session_id: str, user_id: str) -> Optional[ExamSession]:
     with _get_db() as conn:
-        conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+        row = conn.execute(
+            "SELECT data FROM sessions WHERE session_id = ? AND user_id = ?",
+            (session_id, user_id),
+        ).fetchone()
+    if row:
+        try:
+            return ExamSession.model_validate_json(row[0])
+        except Exception:
+            pass
+    return None
+
+
+def _delete_sqlite(session_id: str, user_id: str):
+    with _get_db() as conn:
+        conn.execute(
+            "DELETE FROM sessions WHERE session_id = ? AND user_id = ?",
+            (session_id, user_id),
+        )
 
 
 # =====================
 # Supabase
 # =====================
 
-def _save_supabase(session: ExamSession):
+def _save_supabase(session: ExamSession, user_id: str):
     client = _get_supabase()
     # Strip base64 images before saving to DB (they're in storage)
     data = session.model_dump()
@@ -100,15 +128,21 @@ def _save_supabase(session: ExamSession):
         r.pop("form_image_base64", None)
     client.table("sessions").upsert({
         "session_id": session.session_id,
+        "user_id": user_id,
         "data": json.dumps(data),
     }).execute()
 
 
-def _load_all_supabase() -> dict[str, ExamSession]:
+def _load_user_sessions_supabase(user_id: str) -> dict[str, ExamSession]:
     client = _get_supabase()
     sessions = {}
     try:
-        result = client.table("sessions").select("session_id, data").execute()
+        result = (
+            client.table("sessions")
+            .select("session_id, data")
+            .eq("user_id", user_id)
+            .execute()
+        )
         for row in result.data:
             try:
                 data = row["data"]
@@ -122,9 +156,29 @@ def _load_all_supabase() -> dict[str, ExamSession]:
     return sessions
 
 
-def _delete_supabase(session_id: str):
+def _load_session_supabase(session_id: str, user_id: str) -> Optional[ExamSession]:
     client = _get_supabase()
-    client.table("sessions").delete().eq("session_id", session_id).execute()
+    try:
+        result = (
+            client.table("sessions")
+            .select("data")
+            .eq("session_id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if result.data:
+            data = result.data[0]["data"]
+            if isinstance(data, str):
+                data = json.loads(data)
+            return ExamSession.model_validate(data)
+    except Exception as e:
+        print(f"Supabase load session error: {e}")
+    return None
+
+
+def _delete_supabase(session_id: str, user_id: str):
+    client = _get_supabase()
+    client.table("sessions").delete().eq("session_id", session_id).eq("user_id", user_id).execute()
     # Delete all images for this session
     try:
         files = client.storage.from_(BUCKET_NAME).list(session_id)
@@ -193,21 +247,27 @@ def init_db():
         print("Using SQLite fallback (no Supabase credentials)")
 
 
-def save_session(session: ExamSession):
+def save_session(session: ExamSession, user_id: str = "dev-user"):
     if _use_supabase():
-        _save_supabase(session)
+        _save_supabase(session, user_id)
     else:
-        _save_sqlite(session)
+        _save_sqlite(session, user_id)
 
 
-def load_all_sessions() -> dict[str, ExamSession]:
+def load_user_sessions(user_id: str) -> dict[str, ExamSession]:
     if _use_supabase():
-        return _load_all_supabase()
-    return _load_all_sqlite()
+        return _load_user_sessions_supabase(user_id)
+    return _load_user_sessions_sqlite(user_id)
 
 
-def delete_session(session_id: str):
+def load_session(session_id: str, user_id: str) -> Optional[ExamSession]:
     if _use_supabase():
-        _delete_supabase(session_id)
+        return _load_session_supabase(session_id, user_id)
+    return _load_session_sqlite(session_id, user_id)
+
+
+def delete_session(session_id: str, user_id: str = "dev-user"):
+    if _use_supabase():
+        _delete_supabase(session_id, user_id)
     else:
-        _delete_sqlite(session_id)
+        _delete_sqlite(session_id, user_id)

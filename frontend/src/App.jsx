@@ -1,24 +1,212 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Webcam from "react-webcam";
 import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
 import {
   Camera, FileText, BarChart3, Settings, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, Download, Plus,
   Scan, RotateCcw, Users, Trophy, Target, Upload,
-  ClipboardList, Eye, Edit3, Check, X, UserPlus, Trash2, Image
+  ClipboardList, Eye, Edit3, Check, X, UserPlus, Trash2, Image,
+  LogOut, Mail, Lock, UserCircle
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
+// Initialize Supabase client (only if configured)
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+// Axios interceptor: attach JWT token to every request
+axios.interceptors.request.use(async (config) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.access_token) {
+        config.headers.Authorization = `Bearer ${data.session.access_token}`;
+      }
+    } catch {}
+  }
+  return config;
+});
+
+// Axios response interceptor: handle 401 (expired token)
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && supabase) {
+      await supabase.auth.signOut();
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
 // ============================================================
+// Login Page
+// ============================================================
+
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegister, setIsRegister] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      if (isRegister) {
+        const { data, error: err } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (err) throw err;
+        if (data.user && !data.session) {
+          setSuccess("Kayit basarili! E-posta adresinizi dogrulayin.");
+        } else if (data.session) {
+          onLogin(data.user);
+        }
+      } else {
+        const { data, error: err } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (err) throw err;
+        onLogin(data.user);
+      }
+    } catch (err) {
+      const msg = err.message || "Bir hata olustu";
+      if (msg.includes("Invalid login")) {
+        setError("E-posta veya sifre hatali");
+      } else if (msg.includes("already registered")) {
+        setError("Bu e-posta zaten kayitli. Giris yapin.");
+      } else if (msg.includes("Password should be")) {
+        setError("Sifre en az 6 karakter olmali");
+      } else if (msg.includes("valid email")) {
+        setError("Gecerli bir e-posta adresi girin");
+      } else {
+        setError(msg);
+      }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Scan className="w-8 h-8 text-blue-500" />
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">OMR Scanner</h1>
+          </div>
+          <p className="text-sm text-slate-500">
+            Optik Form Okuyucu ve Notlandirma Sistemi
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+            {isRegister ? "Hesap Olustur" : "Giris Yap"}
+          </h2>
+          <p className="text-xs text-slate-500 mb-5">
+            {isRegister
+              ? "Yeni bir ogretmen hesabi olusturun"
+              : "E-posta ve sifrenizle giris yapin"}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                E-posta
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="ornek@okul.edu.tr"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Sifre
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isRegister ? "En az 6 karakter" : "Sifreniz"}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2 text-xs text-green-700 dark:text-green-300">
+                {success}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+            >
+              {loading ? (
+                <span className="inline-block animate-spin mr-2">&#9696;</span>
+              ) : null}
+              {isRegister ? "Kayit Ol" : "Giris Yap"}
+            </button>
+          </form>
+
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-700 text-center">
+            <button
+              onClick={() => { setIsRegister(!isRegister); setError(""); setSuccess(""); }}
+              className="text-xs text-blue-500 hover:underline"
+            >
+              {isRegister
+                ? "Zaten hesabiniz var mi? Giris yapin"
+                : "Hesabiniz yok mu? Kayit olun"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // Header
 // ============================================================
 
-function Header({ page, setPage, session }) {
+function Header({ page, setPage, session, user, onLogout }) {
   const tabs = [
     { id: "setup", label: "Ayarlar", icon: Settings },
     { id: "roster", label: "Sınıf", icon: ClipboardList },
@@ -36,11 +224,22 @@ function Header({ page, setPage, session }) {
             <span className="hidden sm:inline">OMR Scanner</span>
             <span className="sm:hidden">OMR</span>
           </h1>
-          {session && (
-            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-              {session.course_code ? `${session.course_code} · ` : ""}{session.num_questions}S
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {session && (
+              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                {session.course_code ? `${session.course_code} · ` : ""}{session.num_questions}S
+              </span>
+            )}
+            {user && onLogout && (
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors"
+                title={user.email}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
         <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
           {tabs.map((t) => (
@@ -1941,10 +2140,34 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [results, setResults] = useState([]);
   const [backendStatus, setBackendStatus] = useState("checking");
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(!!supabase);
+
+  // Check auth state on mount
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    // Get current session
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user || null);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Wake up backend on page load
   useEffect(() => {
     if (!API) { setBackendStatus("ready"); return; }
+    if (supabase && !user) return; // Don't wake backend until logged in
     let cancelled = false;
     const wake = async () => {
       for (let i = 0; i < 5; i++) {
@@ -1961,7 +2184,7 @@ export default function App() {
     };
     wake();
     return () => { cancelled = true; };
-  }, []);
+  }, [user]);
 
   const handleResume = ({ session: s, results: r }) => {
     setSession(s);
@@ -1969,20 +2192,47 @@ export default function App() {
     setPage(r.length > 0 ? "results" : "scan");
   };
 
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setUser(null);
+    setSession(null);
+    setResults([]);
+    setPage("setup");
+  };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <span className="inline-block animate-spin text-2xl mb-3">&#9696;</span>
+          <p className="text-sm text-slate-500">Yukleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if Supabase is configured and user is not logged in
+  if (supabase && !user) {
+    return <LoginPage onLogin={(u) => setUser(u)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {backendStatus === "waking" && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-700">
           <span className="inline-block animate-spin mr-2">&#9696;</span>
-          Sunucu uyanıyor, lütfen bekleyin...
+          Sunucu uyaniyor, lutfen bekleyin...
         </div>
       )}
       {backendStatus === "error" && (
         <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-center text-sm text-red-700">
-          Sunucuya bağlanılamadı. Sayfayı yenileyin veya birkaç dakika sonra tekrar deneyin.
+          Sunucuya baglanilamadi. Sayfayi yenileyin veya birkac dakika sonra tekrar deneyin.
         </div>
       )}
-      <Header page={page} setPage={setPage} session={session} />
+      <Header page={page} setPage={setPage} session={session} user={user} onLogout={handleLogout} />
       <main className="pb-20">
         {page === "setup" && (
           <>
