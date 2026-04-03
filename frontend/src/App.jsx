@@ -570,6 +570,17 @@ function RosterPage({ session, setSession, setPage }) {
         session_id: res.data.session_id,
       };
       setSession(newSession);
+
+      // Re-upload roster to the new session if roster was saved
+      const rosterData = session._roster || [];
+      if (rosterData.length > 0) {
+        try {
+          await axios.post(`${API}/api/sessions/${res.data.session_id}/roster`, {
+            students: rosterData,
+          });
+        } catch { /* ignore roster re-upload failure */ }
+      }
+
       return newSession;
     } catch {
       return null;
@@ -586,20 +597,22 @@ function RosterPage({ session, setSession, setPage }) {
       return;
     }
     setUploading(true);
+
+    const _uploadRosterToSession = async (sid) => {
+      await axios.post(`${API}/api/sessions/${sid}/roster`, { students });
+      // Save roster in session state for re-creation
+      setSession((prev) => ({ ...prev, _roster: students }));
+    };
+
     try {
-      await axios.post(`${API}/api/sessions/${session.session_id}/roster`, {
-        students: students,
-      });
+      await _uploadRosterToSession(session.session_id);
       setPage("scan");
     } catch (e) {
-      // Session backend'de kaybolmuşsa otomatik yeniden oluştur
       if (e.response?.status === 404) {
         const newSession = await _recreateSession();
         if (newSession) {
           try {
-            await axios.post(`${API}/api/sessions/${newSession.session_id}/roster`, {
-              students: students,
-            });
+            await _uploadRosterToSession(newSession.session_id);
             setPage("scan");
             setUploading(false);
             return;
@@ -825,7 +838,7 @@ function ScanningOverlay() {
 // Scan Page
 // ============================================================
 
-function ScanPage({ session, setResults, results }) {
+function ScanPage({ session, setSession, setResults, results }) {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
   const cameraFileRef = useRef(null);
@@ -842,14 +855,53 @@ function ScanPage({ session, setResults, results }) {
     await processImage(imageSrc);
   }, [session]);
 
+  const _ensureSession = async () => {
+    /* Make sure backend has this session (with roster). If not, recreate. */
+    if (!session?.session_id) return session;
+    try {
+      await axios.get(`${API}/api/sessions/${session.session_id}`);
+      return session; // exists
+    } catch {
+      // Session gone — recreate
+      try {
+        const payload = {
+          answers: session.answer_key,
+          num_questions: session.num_questions || 40,
+          num_options: session.num_options || 5,
+          course_code: session.course_code || "",
+        };
+        if (session.use_booklet && session.answer_key_b) {
+          payload.answers_b = session.answer_key_b;
+          payload.use_booklet = true;
+        }
+        const res = await axios.post(`${API}/api/sessions/create`, payload);
+        const newSession = { ...session, session_id: res.data.session_id };
+
+        // Re-upload roster
+        const roster = session._roster || [];
+        if (roster.length > 0) {
+          try {
+            await axios.post(`${API}/api/sessions/${res.data.session_id}/roster`, { students: roster });
+          } catch { /* ignore */ }
+        }
+
+        setSession(newSession);
+        return newSession;
+      } catch {
+        return session;
+      }
+    }
+  };
+
   const processImage = async (base64Image) => {
     setScanning(true);
     try {
+      const s = await _ensureSession();
       const formData = new FormData();
       formData.append("image_base64", base64Image);
-      formData.append("num_questions", session.num_questions);
-      if (session.session_id) formData.append("session_id", session.session_id);
-      if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
+      formData.append("num_questions", s.num_questions);
+      if (s.session_id) formData.append("session_id", s.session_id);
+      if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
       const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
       setLastResult(res.data);
@@ -867,11 +919,12 @@ function ScanPage({ session, setResults, results }) {
     if (!file) return;
     setScanning(true);
     try {
+      const s = await _ensureSession();
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("num_questions", session.num_questions);
-      if (session.session_id) formData.append("session_id", session.session_id);
-      if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
+      formData.append("num_questions", s.num_questions);
+      if (s.session_id) formData.append("session_id", s.session_id);
+      if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
       const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
       setLastResult(res.data);
@@ -1599,7 +1652,7 @@ export default function App() {
           </>
         )}
         {page === "roster" && <RosterPage session={session} setSession={setSession} setPage={setPage} />}
-        {page === "scan" && <ScanPage session={session} setResults={setResults} results={results} />}
+        {page === "scan" && <ScanPage session={session} setSession={setSession} setResults={setResults} results={results} />}
         {page === "review" && <ReviewPage session={session} results={results} />}
         {page === "results" && <ResultsPage session={session} results={results} />}
       </main>

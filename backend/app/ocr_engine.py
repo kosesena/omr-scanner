@@ -128,6 +128,7 @@ class OCREngine:
         """Set the roster for name/surname matching.
         students: list of dicts with 'name', 'surname', 'student_number'"""
         self._roster_students = students or []
+        logger.info(f"OCR roster set: {len(self._roster_students)} students")
 
     # ---- Box extraction and analysis ----
 
