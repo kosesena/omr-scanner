@@ -417,19 +417,76 @@ class OCREngine:
     def _read_name_with_tesseract(self, warped_gray: np.ndarray,
                                     field_name: str,
                                     filled_info: list) -> tuple:
-        """Read name/surname field character by character with Tesseract.
+        """Read name/surname field using Tesseract.
+        Tries whole-line first, then per-character fallback.
         Returns (text, avg_confidence)."""
         boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+
+        # Strategy 1: Read the whole name region at once (PSM 7 - single line)
+        first_filled = -1
+        last_filled = -1
+        for idx, is_filled, _ in filled_info:
+            if is_filled:
+                if first_filled == -1:
+                    first_filled = idx
+                last_filled = idx
+
+        if first_filled >= 0 and HAS_TESSERACT:
+            x1 = boxes[first_filled][0]
+            y1 = min(b[1] for b in boxes[first_filled:last_filled + 1])
+            x2 = boxes[last_filled][2]
+            y2 = max(b[3] for b in boxes[first_filled:last_filled + 1])
+
+            h, w = warped_gray.shape[:2]
+            pad = 3
+            x1, y1 = max(0, x1 - pad), max(0, y1 - pad)
+            x2, y2 = min(w, x2 + pad), min(h, y2 + pad)
+
+            region = warped_gray[y1:y2, x1:x2]
+            if region.size > 0:
+                scale = max(100 / max(region.shape[0], 1), 3)
+                big = cv2.resize(region, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                min_v, max_v = float(np.min(big)), float(np.max(big))
+                if max_v - min_v > 20:
+                    normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+                else:
+                    normalized = big
+                blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+                binary = cv2.adaptiveThreshold(
+                    blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    cv2.THRESH_BINARY, 21, 8
+                )
+                border = 15
+                padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                             cv2.BORDER_CONSTANT, value=255)
+
+                for lang in ["tur", "eng"]:
+                    try:
+                        config = "--psm 7 --oem 3"
+                        text = pytesseract.image_to_string(padded, lang=lang, config=config).strip()
+                        text = "".join(c for c in text if c.isalpha() or c == " ").strip().upper()
+                        if len(text) >= 2:
+                            data = pytesseract.image_to_data(
+                                padded, lang=lang, config=config,
+                                output_type=pytesseract.Output.DICT
+                            )
+                            confs = [int(c) for c in data["conf"] if int(c) > 0]
+                            avg = sum(confs) / max(len(confs), 1) / 100.0
+                            logger.info(f"OCR whole-line {field_name} ({lang}): '{text}' (conf={avg:.2f})")
+                            if avg > 0.2:
+                                return (text, avg)
+                    except Exception as e:
+                        logger.warning(f"Tesseract whole-line {field_name} error: {e}")
+
+        # Strategy 2: Per-character fallback
         characters = []
         confidences = []
 
         for idx, is_filled, ink_score in filled_info:
             if not is_filled:
-                # Check if remaining boxes have ink
                 remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
                 if not remaining_filled:
                     break
-                # Gap = space between words
                 if characters and characters[-1] != " ":
                     characters.append(" ")
                     confidences.append(1.0)
@@ -443,7 +500,7 @@ class OCREngine:
         text = "".join(characters).strip()
         avg_conf = sum(confidences) / max(len(confidences), 1)
 
-        logger.info(f"OCR Tesseract {field_name}: '{text}' (conf={avg_conf:.2f})")
+        logger.info(f"OCR per-char {field_name}: '{text}' (conf={avg_conf:.2f})")
         return (text, avg_conf)
 
     # ---- Name/Surname recognition via roster matching ----
@@ -575,19 +632,90 @@ class OCREngine:
                 pattern_str, char_count, word_lengths, box_pattern
             )
 
+    def _read_student_no_whole(self, warped_gray: np.ndarray,
+                                boxes: list, filled_info: list) -> tuple:
+        """Read student number by extracting the entire number region at once.
+        Returns (text, confidence)."""
+        if not HAS_TESSERACT or not boxes:
+            return ("", 0.0)
+
+        # Find filled range
+        first_filled = -1
+        last_filled = -1
+        for idx, is_filled, _ in filled_info:
+            if is_filled:
+                if first_filled == -1:
+                    first_filled = idx
+                last_filled = idx
+
+        if first_filled == -1:
+            return ("", 0.0)
+
+        # Extract the entire region spanning all filled boxes
+        x1 = boxes[first_filled][0]
+        y1 = min(b[1] for b in boxes[first_filled:last_filled + 1])
+        x2 = boxes[last_filled][2]
+        y2 = max(b[3] for b in boxes[first_filled:last_filled + 1])
+
+        # Add small padding
+        h, w = warped_gray.shape[:2]
+        pad = 3
+        x1, y1 = max(0, x1 - pad), max(0, y1 - pad)
+        x2, y2 = min(w, x2 + pad), min(h, y2 + pad)
+
+        region = warped_gray[y1:y2, x1:x2]
+        if region.size == 0:
+            return ("", 0.0)
+
+        # Preprocess: upscale, normalize, threshold
+        scale = max(120 / max(region.shape[0], 1), 3)
+        big = cv2.resize(region, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        min_v, max_v = float(np.min(big)), float(np.max(big))
+        if max_v - min_v > 20:
+            normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+        else:
+            normalized = big
+        blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+        binary = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 21, 8
+        )
+        border = 20
+        padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                     cv2.BORDER_CONSTANT, value=255)
+
+        config = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789"
+        try:
+            text = pytesseract.image_to_string(padded, lang="eng", config=config).strip()
+            text = "".join(c for c in text if c.isdigit())
+
+            if len(text) >= 6:
+                data = pytesseract.image_to_data(
+                    padded, lang="eng", config=config,
+                    output_type=pytesseract.Output.DICT
+                )
+                confs = [int(c) for c in data["conf"] if int(c) > 0]
+                avg = sum(confs) / max(len(confs), 1) / 100.0
+                logger.info(f"OCR student_no whole-line: '{text}' (conf={avg:.2f})")
+                return (text, avg)
+        except Exception as e:
+            logger.warning(f"Tesseract whole-line error: {e}")
+
+        return ("", 0.0)
+
     def _read_student_no(self, warped_gray: np.ndarray, boxes: list,
                           filled_info: list, box_pattern: list) -> FieldResult:
-        """Read student number using per-digit Tesseract."""
+        """Read student number using multiple strategies."""
+
+        # Strategy 1: Read per-digit (original method)
         characters = []
         confidences = []
 
         for idx, is_filled, ink_score in filled_info:
             if not is_filled:
-                # Check if all remaining are empty
                 remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
                 if not remaining_filled:
                     break
-                # Gap shouldn't happen in student number, but handle it
                 characters.append("?")
                 confidences.append(0.0)
                 continue
@@ -597,19 +725,52 @@ class OCREngine:
             characters.append(digit)
             confidences.append(conf)
 
-        text = "".join(characters)
-        avg_conf = sum(confidences) / max(len(confidences), 1)
+        per_digit_text = "".join(characters)
+        per_digit_conf = sum(confidences) / max(len(confidences), 1)
+        per_digit_unknowns = per_digit_text.count("?")
 
-        # Try roster matching for student_no too
+        # Strategy 2: Read whole number region at once
+        whole_text, whole_conf = self._read_student_no_whole(
+            warped_gray, boxes, filled_info
+        )
+        whole_unknowns = 0 if whole_text else 99
+
+        # Pick the better result
+        if whole_text and whole_unknowns < per_digit_unknowns:
+            text = whole_text
+            avg_conf = whole_conf
+            # Rebuild confidences list for the whole text
+            confidences = [whole_conf] * len(text)
+        else:
+            text = per_digit_text
+            avg_conf = per_digit_conf
+
+        logger.info(f"OCR student_no: per_digit='{per_digit_text}'({per_digit_conf:.2f}), "
+                     f"whole='{whole_text}'({whole_conf:.2f}), chosen='{text}'")
+
+        # Try roster matching if there are unknowns
         if "?" in text and self._roster_students:
             matched = self._match_student_no_roster(text)
             if matched:
                 text = matched
                 avg_conf = max(avg_conf, 0.7)
+                confidences = [0.7] * len(text)
+
+        # Also try roster matching with whole-line result if per-digit failed
+        if "?" in text and whole_text and self._roster_students:
+            matched = self._match_student_no_roster(whole_text) if "?" in whole_text else ""
+            if not matched and len(whole_text) >= 6:
+                # Try exact match with roster
+                for student in self._roster_students:
+                    if student.get("student_number", "").strip() == whole_text:
+                        text = whole_text
+                        avg_conf = 0.9
+                        confidences = [0.9] * len(text)
+                        break
 
         needs_review = avg_conf < 0.5 or not text or "?" in text
 
-        logger.info(f"OCR student_no: '{text}' (conf={avg_conf:.2f})")
+        logger.info(f"OCR student_no final: '{text}' (conf={avg_conf:.2f})")
 
         return FieldResult(
             text=text,
