@@ -465,12 +465,18 @@ class OMREngine:
             intensities = {}
             for bk, (bx, by) in positions.items():
                 intensities[bk] = self._sample_bubble_intensity(warped_gray, bx, by, r)
+                logger.info(f"Booklet {bk}: pos=({bx:.0f},{by:.0f}), intensity={intensities[bk]:.1f}")
 
-            # Darker = filled
-            if intensities["B"] < intensities["A"] - 15:
+            # Darker = filled (lower intensity = darker)
+            diff = intensities["A"] - intensities["B"]
+            logger.info(f"Booklet intensity diff (A-B): {diff:.1f}")
+            if intensities["B"] < intensities["A"] - 10:
                 return "B"
-            return "A"  # default
-        except Exception:
+            if intensities["A"] < intensities["B"] - 10:
+                return "A"
+            return "A"  # default when ambiguous
+        except Exception as e:
+            logger.error(f"Booklet read error: {e}")
             return "A"
 
     def grade(self, answers: dict, answer_key: dict) -> tuple:
