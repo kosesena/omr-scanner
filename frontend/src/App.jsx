@@ -1580,6 +1580,17 @@ function SavedSessionsList({ onResume, onNew }) {
     }
   };
 
+  const deleteSession = async (e, sessionId) => {
+    e.stopPropagation(); // Don't trigger resume
+    if (!confirm("Bu sınavı silmek istediğinize emin misiniz?")) return;
+    try {
+      await axios.delete(`${API}/api/sessions/${sessionId}`);
+      setSavedSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+    } catch {
+      alert("Silinemedi");
+    }
+  };
+
   if (loading) return <div className="text-center py-8 text-slate-500">Yükleniyor...</div>;
   if (savedSessions.length === 0) return null;
 
@@ -1592,36 +1603,47 @@ function SavedSessionsList({ onResume, onNew }) {
         </h3>
         <div className="space-y-2">
           {savedSessions.map((s) => (
-            <button
+            <div
               key={s.session_id}
-              onClick={() => resumeSession(s)}
-              className="w-full p-3 sm:p-4 rounded-lg border border-slate-200 dark:border-slate-700 active:bg-blue-50 dark:active:bg-slate-800 transition-colors text-left"
+              className="flex items-center gap-2"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-900 dark:text-white">
-                  {s.course_code || s.session_id}
-                </span>
-                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-              </div>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {s.course_code && (
-                  <span className="text-xs text-slate-400">{s.session_id}</span>
-                )}
-                <span className="text-xs text-slate-500">
-                  {s.num_questions} soru · {s.num_options || 5} şık
-                </span>
-                {s.scanned_count > 0 && (
-                  <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs">
-                    {s.scanned_count} tarandı
+              <button
+                onClick={() => resumeSession(s)}
+                className="flex-1 p-3 sm:p-4 rounded-lg border border-slate-200 dark:border-slate-700 active:bg-blue-50 dark:active:bg-slate-800 transition-colors text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                    {s.course_code || s.session_id}
                   </span>
-                )}
-                {s.roster_count > 0 && (
-                  <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-xs">
-                    {s.roster_count} öğrenci
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                </div>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  {s.course_code && (
+                    <span className="text-xs text-slate-400">{s.session_id}</span>
+                  )}
+                  <span className="text-xs text-slate-500">
+                    {s.num_questions} soru · {s.num_options || 5} şık
                   </span>
-                )}
-              </div>
-            </button>
+                  {s.scanned_count > 0 && (
+                    <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs">
+                      {s.scanned_count} tarandı
+                    </span>
+                  )}
+                  {s.roster_count > 0 && (
+                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-xs">
+                      {s.roster_count} öğrenci
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={(e) => deleteSession(e, s.session_id)}
+                className="p-2.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+                title="Sınavı sil"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           ))}
         </div>
       </div>

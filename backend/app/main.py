@@ -15,6 +15,9 @@ import re
 import base64
 from typing import Optional
 from io import BytesIO
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     import pdfplumber
@@ -176,6 +179,16 @@ def list_sessions():
         }
         for s in sessions.values()
     ]
+
+
+@app.delete("/api/sessions/{session_id}")
+def delete_session_endpoint(session_id: str):
+    """Delete an exam session."""
+    if session_id not in sessions:
+        raise HTTPException(404, "Session not found")
+    del sessions[session_id]
+    delete_session(session_id)
+    return {"message": "Session deleted"}
 
 
 # =====================
