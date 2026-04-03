@@ -554,33 +554,63 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
         # If we have a roster and the student number matched, use roster name/surname
         roster_name = ""
         roster_surname = ""
+        matched_number = ""
         if session_id and session_id in sessions:
             sess = sessions[session_id]
             if sess.roster and sess.roster.students and number_field.text:
-                student_no = number_field.text.replace("?", "")
+                ocr_no = number_field.text
+
+                # 1. Exact match
                 for s in sess.roster.students:
-                    if s.student_number == number_field.text:
-                        # Exact match
+                    if s.student_number == ocr_no:
                         roster_name = s.name
                         roster_surname = s.surname
+                        matched_number = s.student_number
                         break
-                if not roster_name:
-                    # Try partial match (with ? wildcards)
+
+                # 2. Wildcard match (? characters)
+                if not roster_name and "?" in ocr_no:
                     for s in sess.roster.students:
                         sno = s.student_number.strip()
-                        if len(sno) == len(number_field.text):
-                            match = True
-                            for a, b in zip(number_field.text, sno):
-                                if a != "?" and a != b:
-                                    match = False
-                                    break
+                        if len(sno) == len(ocr_no):
+                            match = all(a == "?" or a == b for a, b in zip(ocr_no, sno))
                             if match:
                                 roster_name = s.name
                                 roster_surname = s.surname
-                                # Also fix the student number
-                                number_field.text = sno
-                                number_field.avg_confidence = max(number_field.avg_confidence, 0.7)
+                                matched_number = sno
                                 break
+
+                # 3. Fuzzy match — allow up to 2 wrong digits
+                if not roster_name:
+                    best_match = None
+                    best_diff = 99
+                    for s in sess.roster.students:
+                        sno = s.student_number.strip()
+                        if len(sno) != len(ocr_no):
+                            continue
+                        diff = sum(1 for a, b in zip(ocr_no, sno) if a != "?" and a != b)
+                        if diff < best_diff:
+                            best_diff = diff
+                            best_match = s
+
+                    # Accept fuzzy match only if unique with <= 2 differences
+                    if best_match and best_diff <= 2:
+                        # Check uniqueness: no other student with same diff count
+                        same_diff_count = sum(
+                            1 for s in sess.roster.students
+                            if len(s.student_number.strip()) == len(ocr_no)
+                            and sum(1 for a, b in zip(ocr_no, s.student_number.strip()) if a != "?" and a != b) == best_diff
+                        )
+                        if same_diff_count == 1:
+                            roster_name = best_match.name
+                            roster_surname = best_match.surname
+                            matched_number = best_match.student_number
+                            logger.info(f"Fuzzy roster match: '{ocr_no}' -> '{matched_number}' "
+                                         f"(diff={best_diff})")
+
+                if matched_number:
+                    number_field.text = matched_number
+                    number_field.avg_confidence = max(number_field.avg_confidence, 0.7)
 
         final_name = roster_name if roster_name else name_field.text
         final_surname = roster_surname if roster_surname else surname_field.text
