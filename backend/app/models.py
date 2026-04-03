@@ -102,6 +102,7 @@ class VerificationRequest(BaseModel):
     student_name: Optional[str] = None
     student_surname: Optional[str] = None
     student_number: Optional[str] = None
+    booklet: Optional[str] = None
     approved: bool = False
 
 

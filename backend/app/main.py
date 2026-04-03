@@ -876,6 +876,21 @@ def verify_result(session_id: str, req: VerificationRequest):
         result.student_number.text = req.student_number
         result.student_number.needs_review = False
 
+    # Re-grade if booklet was changed
+    if req.booklet is not None and req.booklet != result.booklet and result.answers:
+        result.booklet = req.booklet
+        # Pick the correct answer key
+        answer_key = session.answer_key
+        if req.booklet == "B" and session.answer_key_b:
+            answer_key = session.answer_key_b
+        # Re-grade
+        engine = OMREngine(num_questions=session.num_questions, num_options=session.num_options)
+        score, correct, total = engine.grade(result.answers, answer_key)
+        result.score = score
+        result.correct_count = correct
+        result.total_questions = total
+        logger.info(f"Re-graded with booklet {req.booklet}: {score:.0f} ({correct}/{total})")
+
     if req.approved:
         result.needs_review = False
         if idx in session.pending_review:
@@ -884,7 +899,7 @@ def verify_result(session_id: str, req: VerificationRequest):
         _match_student_to_roster(session, result, idx)
 
     save_session(session)
-    return {"message": "Verified", "index": idx}
+    return {"message": "Verified", "index": idx, "score": result.score, "correct_count": result.correct_count}
 
 
 # =====================

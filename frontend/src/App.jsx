@@ -1262,6 +1262,7 @@ function ReviewPage({ session, results, setResults }) {
   const [editName, setEditName] = useState("");
   const [editSurname, setEditSurname] = useState("");
   const [editNo, setEditNo] = useState("");
+  const [editBooklet, setEditBooklet] = useState("A");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -1275,6 +1276,7 @@ function ReviewPage({ session, results, setResults }) {
       setEditName(r.student_name?.text || "");
       setEditSurname(r.student_surname?.text || "");
       setEditNo(r.student_number?.text || "");
+      setEditBooklet(r.booklet || "A");
     }
   }, [session, results]);
 
@@ -1285,6 +1287,7 @@ function ReviewPage({ session, results, setResults }) {
       setEditName(r.student_name?.text || "");
       setEditSurname(r.student_surname?.text || "");
       setEditNo(r.student_number?.text || "");
+      setEditBooklet(r.booklet || "A");
     }
   };
 
@@ -1293,19 +1296,25 @@ function ReviewPage({ session, results, setResults }) {
     setLoading(true);
     try {
       const resultIdx = reviews[currentIdx]._index;
-      await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
+      const verifyRes = await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
         result_index: resultIdx,
         student_name: current.student_name?.text || "",
         student_surname: current.student_surname?.text || "",
         student_number: editNo,
+        booklet: editBooklet,
         approved: true,
       });
+      const newScore = verifyRes.data.score;
+      const newCorrect = verifyRes.data.correct_count;
       // Update results state with corrected data
       setResults((prev) => prev.map((r, i) => {
         if (i !== resultIdx) return r;
         return {
           ...r,
           student_number: { ...r.student_number, text: editNo, needs_review: false },
+          booklet: editBooklet,
+          score: newScore != null ? newScore : r.score,
+          correct_count: newCorrect != null ? newCorrect : r.correct_count,
           needs_review: false,
         };
       }));
@@ -1415,6 +1424,32 @@ function ReviewPage({ session, results, setResults }) {
             </span>
           )}
         </div>
+
+        {/* Booklet selection */}
+        {session?.use_booklet && (
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-slate-600 w-16">Kitapçık:</label>
+            <div className="flex gap-2">
+              {["A", "B"].map((bk) => (
+                <button
+                  key={bk}
+                  onClick={() => setEditBooklet(bk)}
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-bold transition-colors",
+                    editBooklet === bk
+                      ? "bg-blue-500 text-white"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  )}
+                >
+                  {bk}
+                </button>
+              ))}
+            </div>
+            {editBooklet !== (current.booklet || "A") && (
+              <span className="text-xs text-amber-500 font-medium">Değiştirildi</span>
+            )}
+          </div>
+        )}
 
         {/* Score display */}
         {current.score != null && (
