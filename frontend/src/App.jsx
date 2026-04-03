@@ -698,17 +698,28 @@ function RosterPage({ session, setPage }) {
 
 function ScanningOverlay() {
   const steps = [
-    "Form algılanıyor",
-    "Perspektif düzeltiliyor",
-    "Cevaplar okunuyor",
-    "Puanlama yapılıyor",
+    { text: "Form algılanıyor", detail: "ArUco işaretçileri aranıyor" },
+    { text: "Perspektif düzeltiliyor", detail: "Sayfa hizalanıyor" },
+    { text: "Optik okuma başladı", detail: "Baloncuklar taranıyor" },
+    { text: "Cevaplar analiz ediliyor", detail: "Doluluk oranları hesaplanıyor" },
+    { text: "Ad / Soyad okunuyor", detail: "El yazısı tanınıyor" },
+    { text: "Öğrenci numarası okunuyor", detail: "Karakter tanıma yapılıyor" },
+    { text: "Puanlama yapılıyor", detail: "Cevap anahtarıyla karşılaştırılıyor" },
+    { text: "Sonuçlar hazırlanıyor", detail: "Neredeyse bitti" },
   ];
   const [step, setStep] = useState(0);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setStep((s) => (s + 1) % steps.length);
-    }, 2500);
+      setStep((s) => {
+        if (s + 1 >= steps.length) {
+          setDone(true);
+          return s;
+        }
+        return s + 1;
+      });
+    }, 3500);
     return () => clearInterval(interval);
   }, []);
 
@@ -721,9 +732,28 @@ function ScanningOverlay() {
           <Scan className="w-7 h-7 text-blue-500" />
         </div>
       </div>
-      <p key={step} className="text-sm font-medium text-blue-600 dark:text-blue-400 animate-fade-in">
-        {steps[step]}...
-      </p>
+      <div key={step} className="animate-fade-in">
+        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+          {steps[step].text}...
+        </p>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+          {steps[step].detail}
+        </p>
+      </div>
+      {done && (
+        <p className="text-xs text-slate-400 mt-4 animate-fade-in">
+          Sunucu yanıtı bekleniyor...
+        </p>
+      )}
+      {/* Step indicator */}
+      <div className="flex justify-center gap-1.5 mt-5">
+        {steps.map((_, i) => (
+          <div key={i} className={cn(
+            "w-1.5 h-1.5 rounded-full transition-all duration-300",
+            i <= step ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700"
+          )} />
+        ))}
+      </div>
     </div>
   );
 }
