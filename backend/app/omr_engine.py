@@ -237,59 +237,83 @@ class OMREngine:
         p.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 
     def detect_markers(self, image: np.ndarray) -> dict:
-        """Detect ArUco markers with multiple preprocessing attempts."""
+        """Detect ArUco markers with multiple preprocessing attempts.
+        Merges results from all attempts to maximize marker detection."""
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        valid_ids = {0, 1, 2, 3}
+        markers = {}
 
-        best_corners, best_ids = None, None
+        def _merge(corners, ids):
+            """Merge newly found markers into the result dict."""
+            if ids is None:
+                return
+            for i, mid in enumerate(ids.flatten()):
+                mid_int = int(mid)
+                if mid_int in valid_ids and mid_int not in markers:
+                    markers[mid_int] = {
+                        "center": corners[i][0].mean(axis=0),
+                        "corners": corners[i][0],
+                    }
+
+        preprocessed = []
 
         # Attempt 1: CLAHE enhanced
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(gray)
-        corners, ids, _ = self.detector.detectMarkers(enhanced)
-        if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
-            best_corners, best_ids = corners, ids
+        preprocessed.append(clahe.apply(gray))
 
         # Attempt 2: Original with slight blur
-        if best_ids is None or len(best_ids) < 4:
-            blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-            corners, ids, _ = self.detector.detectMarkers(blurred)
-            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
-                best_corners, best_ids = corners, ids
+        preprocessed.append(cv2.GaussianBlur(gray, (3, 3), 0))
 
         # Attempt 3: Shadow-normalized
-        if best_ids is None or len(best_ids) < 4:
-            blur_bg = cv2.GaussianBlur(gray, (101, 101), 0)
-            blur_bg = np.maximum(blur_bg, 1).astype(np.float32)
-            norm = (gray.astype(np.float32) / blur_bg * 180).clip(0, 255).astype(np.uint8)
-            corners, ids, _ = self.detector.detectMarkers(norm)
-            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
-                best_corners, best_ids = corners, ids
+        blur_bg = cv2.GaussianBlur(gray, (101, 101), 0)
+        blur_bg = np.maximum(blur_bg, 1).astype(np.float32)
+        preprocessed.append((gray.astype(np.float32) / blur_bg * 180).clip(0, 255).astype(np.uint8))
 
         # Attempt 4: Adaptive threshold (binary)
-        if best_ids is None or len(best_ids) < 4:
-            binary = cv2.adaptiveThreshold(
-                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY, 31, 10
-            )
-            corners, ids, _ = self.detector.detectMarkers(binary)
-            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
-                best_corners, best_ids = corners, ids
+        preprocessed.append(cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 31, 10
+        ))
 
         # Attempt 5: Stronger CLAHE
-        if best_ids is None or len(best_ids) < 4:
-            clahe2 = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
-            enhanced2 = clahe2.apply(gray)
-            corners, ids, _ = self.detector.detectMarkers(enhanced2)
-            if ids is not None and (best_ids is None or len(ids) > len(best_ids)):
-                best_corners, best_ids = corners, ids
+        clahe2 = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(4, 4))
+        preprocessed.append(clahe2.apply(gray))
 
-        markers = {}
-        if best_ids is not None:
-            for i, mid in enumerate(best_ids.flatten()):
-                markers[int(mid)] = {
-                    "center": best_corners[i][0].mean(axis=0),
-                    "corners": best_corners[i][0],
-                }
+        # Attempt 6: Otsu threshold
+        _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        preprocessed.append(otsu)
+
+        # Attempt 7: Sharpen
+        kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+        preprocessed.append(cv2.filter2D(gray, -1, kernel))
+
+        # Attempt 8: Raw grayscale
+        preprocessed.append(gray)
+
+        for img in preprocessed:
+            if len(markers) >= 4:
+                break
+            corners, ids, _ = self.detector.detectMarkers(img)
+            _merge(corners, ids)
+
+        # If still missing markers, try at different scales
+        if len(markers) < 4:
+            for scale in [0.75, 1.25, 0.5]:
+                if len(markers) >= 4:
+                    break
+                h, w = gray.shape[:2]
+                resized = cv2.resize(gray, (int(w * scale), int(h * scale)))
+                for preprocess in [
+                    resized,
+                    cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(resized),
+                ]:
+                    corners, ids, _ = self.detector.detectMarkers(preprocess)
+                    if ids is not None:
+                        # Scale corners back to original size
+                        scaled_corners = [c / scale for c in corners]
+                        _merge(scaled_corners, ids)
+                    if len(markers) >= 4:
+                        break
 
         logger.info(f"ArUco detection: found {len(markers)} markers: {list(markers.keys())}")
         return markers
