@@ -457,7 +457,7 @@ def _process_scan(image: np.ndarray, answer_key: dict = None,
     # Step 3: OCR - read character boxes
     ocr = OCREngine()
     # Use raw (non-CLAHE) grayscale for OCR — CLAHE amplifies paper texture noise
-    warped = engine.last_warped_gray_raw or engine.last_warped_gray
+    warped = engine.last_warped_gray_raw if engine.last_warped_gray_raw is not None else engine.last_warped_gray
 
     student_name_result = None
     student_surname_result = None
