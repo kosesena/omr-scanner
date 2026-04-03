@@ -708,6 +708,14 @@ async def scan_sheet(
     if img is None:
         raise HTTPException(400, "Invalid image file")
 
+    # Resize large images to prevent memory issues on free tier
+    max_dim = 2000
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        logger.info(f"Resized image from {w}x{h} to {img.shape[1]}x{img.shape[0]}")
+
     key = None
     key_b = None
     use_bk = False
@@ -762,6 +770,14 @@ async def scan_sheet_base64(
 
     if img is None:
         raise HTTPException(400, "Could not decode image")
+
+    # Resize large images to prevent memory issues on free tier
+    max_dim = 2000
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        logger.info(f"Resized image from {w}x{h} to {img.shape[1]}x{img.shape[0]}")
 
     key = None
     key_b = None

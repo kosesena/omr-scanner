@@ -481,9 +481,15 @@ class OMREngine:
         logger.info(f"Found {len(markers)} ArUco markers: {list(markers.keys())}")
 
         # Step 2: Perspective transform
-        warped = self.perspective_transform(image, markers)
+        logger.info(f"Image shape: {image.shape}, dtype: {image.dtype}")
+        try:
+            warped = self.perspective_transform(image, markers)
+        except Exception as e:
+            logger.error(f"Perspective transform exception: {e}")
+            result.error = f"Perspektif düzeltme hatası: {str(e)}"
+            return result
         if warped is None:
-            result.error = "Perspektif düzeltme başarısız"
+            result.error = "Perspektif düzeltme başarısız — köşe koordinatları hesaplanamadı"
             return result
 
         # Convert to grayscale
