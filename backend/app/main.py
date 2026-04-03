@@ -302,6 +302,28 @@ def _parse_roster_pdf(pdf_bytes: bytes) -> list:
     return students
 
 
+def _clean_student_name(text: str) -> str:
+    """Remove admission type suffixes like ÖSYS, ÜNİ. YATAY GEÇİŞ ÖSYM PU, etc."""
+    # Common admission type patterns in Turkish university rosters
+    patterns = [
+        r'\s*ÜNİ\.?\s*YATAY\s*GEÇİŞ\s*ÖSYM\s*PU\s*$',
+        r'\s*YATAY\s*GEÇİŞ\s*ÖSYM\s*PU\s*$',
+        r'\s*YATAY\s*GEÇİŞ\s*$',
+        r'\s*DİKEY\s*GEÇİŞ\s*$',
+        r'\s*\(?\s*ULUSLARARASI\s*\)?\s*$',
+        r'\s*YÖS\s*(\(ULUSLARARASI\))?\s*$',
+        r'\s*ÖSYS\s*$',
+        r'\s*ÖSYM\s*$',
+        r'\s*EK\s*MADDE\s*\d*\s*$',
+        r'\s*EK\s*KONTENJAN\s*$',
+        r'\s*AF\s*$',
+    ]
+    result = text.strip()
+    for pattern in patterns:
+        result = re.sub(pattern, '', result, flags=re.IGNORECASE).strip()
+    return result
+
+
 def _parse_table_row(row: list) -> Student | None:
     """Try to extract student data from a table row."""
     cells = [str(c).strip() if c else "" for c in row]
@@ -345,7 +367,16 @@ def _parse_table_row(row: list) -> Student | None:
     if name and not surname and " " in name:
         parts = name.split(None, 1)
         name = parts[0]
-        surname = parts[1] if len(parts) > 1 else ""
+        surname = " ".join(parts[1:]).upper() if len(parts) > 1 else ""
+
+    # Clean admission type suffixes from names
+    full_name = f"{name} {surname}".strip()
+    full_name = _clean_student_name(full_name)
+    parts = full_name.split()
+    if not parts:
+        return None
+    surname = parts[-1] if len(parts) > 1 else ""
+    name = " ".join(parts[:-1]) if len(parts) > 1 else parts[0]
 
     return Student(name=name, surname=surname, student_number=student_no)
 
@@ -374,6 +405,9 @@ def _parse_text_line(line: str) -> Student | None:
 
     if not text:
         return None
+
+    # Clean admission type suffixes
+    text = _clean_student_name(text)
 
     parts = text.split()
     if len(parts) == 0:
