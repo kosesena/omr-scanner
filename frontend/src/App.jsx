@@ -751,11 +751,13 @@ function ScanPage({ session, setResults, results }) {
       if (session.session_id) formData.append("session_id", session.session_id);
       if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
 
-      const res = await axios.post(`${API}/api/scan/base64`, formData);
+      const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
       setLastResult(res.data);
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
-      setLastResult({ success: false, error: e.response?.data?.detail || e.message });
+      const msg = e.response?.data?.detail || e.message;
+      const hint = e.code === "ECONNABORTED" ? " (Zaman aşımı — tekrar deneyin)" : "";
+      setLastResult({ success: false, error: msg + hint });
     }
     setScanning(false);
   };
@@ -771,11 +773,13 @@ function ScanPage({ session, setResults, results }) {
       if (session.session_id) formData.append("session_id", session.session_id);
       if (session.answer_key) formData.append("answer_key", JSON.stringify(session.answer_key));
 
-      const res = await axios.post(`${API}/api/scan`, formData);
+      const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
       setLastResult(res.data);
       setResults((prev) => [...prev, res.data]);
     } catch (e) {
-      setLastResult({ success: false, error: e.response?.data?.detail || e.message });
+      const msg = e.response?.data?.detail || e.message;
+      const hint = e.code === "ECONNABORTED" ? " (Zaman aşımı — tekrar deneyin)" : "";
+      setLastResult({ success: false, error: msg + hint });
     }
     setScanning(false);
     e.target.value = "";
