@@ -48,7 +48,7 @@ function Header({ page, setPage, session }) {
               key={t.id}
               onClick={() => setPage(t.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-1 justify-center sm:flex-none",
+                "flex items-center gap-1 px-2 sm:px-4 py-2.5 text-[11px] sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0",
                 page === t.id
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-slate-500 hover:text-slate-700"
