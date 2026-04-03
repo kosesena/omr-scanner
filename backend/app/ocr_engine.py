@@ -154,62 +154,70 @@ class OCREngine:
 
     def _box_ink_score(self, inner: np.ndarray) -> float:
         """
-        Score how much ink is in a box (0.0 = empty, 1.0 = very full).
-        Key insight: compare against MEDIAN of all boxes to handle
-        paper color variation. But for single-box scoring, use absolute.
+        Compute the mean intensity of the inner region.
+        Lower = more ink. We use mean intensity directly for comparison.
         """
         if inner is None or inner.size == 0:
-            return 0.0
+            return 255.0  # white = empty
 
-        mean_val = float(np.mean(inner))
-        # Only count very dark pixels (pen ink, not paper gray)
-        dark_count = float(np.sum(inner < 100)) / inner.size
-
-        return dark_count
+        return float(np.mean(inner))
 
     def _detect_filled_boxes(self, warped_gray: np.ndarray,
                               field_name: str) -> list:
         """
-        Detect which boxes are filled with ink using relative comparison.
-        Computes ink score for ALL boxes, then uses adaptive threshold:
-        boxes with significantly more dark pixels than the median are "filled".
+        Detect which boxes are filled using Otsu-like gap finding.
+
+        Strategy: measure mean intensity per box. Empty boxes are bright
+        (~190-230), filled boxes are dark (~80-160). Find the natural gap.
         """
         boxes = CHAR_BOX_POSITIONS.get(field_name, [])
 
-        # First pass: get ink score for every box
+        # Use aggressive crop: 30% margin to fully remove borders
         scores = []
         for i, box in enumerate(boxes):
             cell = self._extract_box(warped_gray, box)
-            inner = self._get_inner(cell, margin_frac=0.22)
+            inner = self._get_inner(cell, margin_frac=0.30)
             score = self._box_ink_score(inner)
             scores.append(score)
 
         if not scores:
             return []
 
-        # Adaptive threshold:
-        # Empty boxes on the form have some baseline "score" due to paper texture.
-        # Filled boxes should be significantly above this baseline.
-        # Use the MEDIAN score as baseline (most boxes are empty for name fields).
+        # Sort scores to find natural gap between "empty" and "filled"
         sorted_scores = sorted(scores)
-        median_score = sorted_scores[len(sorted_scores) // 2]
 
-        # A box is "filled" if its ink score is at least 3x the median
-        # AND above an absolute minimum
-        absolute_min = 0.03  # at least 3% very dark pixels
-        relative_threshold = max(median_score * 3, absolute_min)
-        # But don't set threshold too high
-        relative_threshold = min(relative_threshold, 0.15)
+        # The highest scores are definitely empty boxes.
+        # Use top 25% of boxes as "empty reference" (at least for name/surname,
+        # most boxes are empty: 20 boxes but name is max ~12 chars)
+        n_empty_ref = max(len(scores) // 4, 3)
+        empty_mean = float(np.mean(sorted_scores[-n_empty_ref:]))
+
+        # A box is "filled" if it's significantly darker than the empty reference.
+        # Threshold: at least 30 intensity units darker than empty mean.
+        threshold = empty_mean - 30
+
+        # Find natural gap if it exists (largest gap in sorted scores)
+        max_gap = 0
+        gap_threshold = threshold
+        for i in range(len(sorted_scores) - 1):
+            gap = sorted_scores[i + 1] - sorted_scores[i]
+            if gap > max_gap:
+                max_gap = gap
+                gap_threshold = (sorted_scores[i] + sorted_scores[i + 1]) / 2
+
+        # Use the gap-based threshold if the gap is significant (>20)
+        if max_gap > 20:
+            threshold = gap_threshold
 
         results = []
         for i, score in enumerate(scores):
-            is_filled = score > relative_threshold
+            is_filled = score < threshold  # lower = darker = filled
             results.append((i, is_filled, score))
 
-        logger.info(f"OCR {field_name} ink scores: "
-                     f"{[f'{s:.3f}' for s in scores]} "
-                     f"median={median_score:.3f} threshold={relative_threshold:.3f} "
-                     f"filled={[i for i, f, _ in results if f]}")
+        filled_indices = [i for i, f, _ in results if f]
+        logger.info(f"OCR {field_name}: intensities={[int(s) for s in scores]} "
+                     f"empty_mean={empty_mean:.0f} threshold={threshold:.0f} "
+                     f"max_gap={max_gap:.0f} filled={filled_indices}")
 
         return results
 

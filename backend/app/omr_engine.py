@@ -454,9 +454,16 @@ class OMREngine:
         else:
             warped_gray_raw = warped.copy()
 
+        # Normalize to reduce shadow effects, then CLAHE for contrast
+        # Gaussian blur large kernel to estimate lighting, then divide out
+        blur = cv2.GaussianBlur(warped_gray_raw, (51, 51), 0)
+        # Avoid division by zero
+        blur = np.maximum(blur, 1).astype(np.float32)
+        normalized = (warped_gray_raw.astype(np.float32) / blur * 128).clip(0, 255).astype(np.uint8)
+
         # CLAHE for bubble reading (enhances contrast for filled detection)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        warped_gray = clahe.apply(warped_gray_raw)
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        warped_gray = clahe.apply(normalized)
 
         # Store both versions
         self.last_warped = warped
