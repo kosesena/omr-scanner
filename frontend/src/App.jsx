@@ -849,6 +849,15 @@ function ScanPage({ session, setSession, setResults, results }) {
   const [facingMode, setFacingMode] = useState("environment");
   const [cameraError, setCameraError] = useState(false);
 
+  // Reload full results from backend to keep indices in sync
+  const reloadResults = async () => {
+    if (!session?.session_id) return;
+    try {
+      const res = await axios.get(`${API}/api/sessions/${session.session_id}`);
+      setResults(res.data.results || []);
+    } catch { }
+  };
+
   const capture = useCallback(async () => {
     if (!webcamRef.current) return;
     const imageSrc = webcamRef.current.getScreenshot();
@@ -929,7 +938,7 @@ function ScanPage({ session, setSession, setResults, results }) {
         try {
           const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
           setLastResult(res.data);
-          setResults((prev) => [...prev, res.data]);
+          await reloadResults();
           setScanning(false);
           return;
         } catch (err) {
@@ -967,7 +976,7 @@ function ScanPage({ session, setSession, setResults, results }) {
         try {
           const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
           setLastResult(res.data);
-          setResults((prev) => [...prev, res.data]);
+          await reloadResults();
           setScanning(false);
           e.target.value = "";
           return;
