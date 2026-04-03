@@ -447,7 +447,7 @@ function SetupPage({ session, setSession, setPage }) {
 // Roster Page (Sınıf Listesi)
 // ============================================================
 
-function RosterPage({ session, setPage }) {
+function RosterPage({ session, setSession, setPage }) {
   const [students, setStudents] = useState([]);
   const [name, setName] = useState("");
   const [surname, setSurname] = useState("");
@@ -505,14 +505,33 @@ function RosterPage({ session, setPage }) {
       return;
     }
     setPdfUploading(true);
-    try {
+
+    const _tryPdfUpload = async (sid) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await axios.post(
-        `${API}/api/sessions/${session.session_id}/roster/pdf`,
+      return axios.post(
+        `${API}/api/sessions/${sid}/roster/pdf`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
+    };
+
+    try {
+      let res;
+      try {
+        res = await _tryPdfUpload(session.session_id);
+      } catch (err) {
+        if (err.response?.status === 404) {
+          const newSession = await _recreateSession();
+          if (newSession) {
+            res = await _tryPdfUpload(newSession.session_id);
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
       const parsed = res.data.students || [];
       if (parsed.length === 0) {
         alert("PDF'den öğrenci bilgisi çıkarılamadı. Formatı kontrol edin.");
@@ -531,13 +550,38 @@ function RosterPage({ session, setPage }) {
     setStudents(students.filter((_, i) => i !== idx));
   };
 
+  const _recreateSession = async () => {
+    /* Backend session kaybolmuşsa (Render uyku/restart), yeniden oluştur */
+    if (!session) return null;
+    try {
+      const payload = {
+        answers: session.answer_key,
+        num_questions: session.num_questions || 40,
+        num_options: session.num_options || 5,
+        course_code: session.course_code || "",
+      };
+      if (session.use_booklet && session.answer_key_b) {
+        payload.answers_b = session.answer_key_b;
+        payload.use_booklet = true;
+      }
+      const res = await axios.post(`${API}/api/sessions/create`, payload);
+      const newSession = {
+        ...session,
+        session_id: res.data.session_id,
+      };
+      setSession(newSession);
+      return newSession;
+    } catch {
+      return null;
+    }
+  };
+
   const uploadRoster = async () => {
     if (!session) {
       alert("Önce sınav oluşturun");
       return;
     }
     if (students.length === 0) {
-      // Skip roster, go directly to scan
       setPage("scan");
       return;
     }
@@ -548,7 +592,26 @@ function RosterPage({ session, setPage }) {
       });
       setPage("scan");
     } catch (e) {
-      alert("Yükleme hatası: " + (e.response?.data?.detail || e.message));
+      // Session backend'de kaybolmuşsa otomatik yeniden oluştur
+      if (e.response?.status === 404) {
+        const newSession = await _recreateSession();
+        if (newSession) {
+          try {
+            await axios.post(`${API}/api/sessions/${newSession.session_id}/roster`, {
+              students: students,
+            });
+            setPage("scan");
+            setUploading(false);
+            return;
+          } catch (e2) {
+            alert("Yükleme hatası: " + (e2.response?.data?.detail || e2.message));
+          }
+        } else {
+          alert("Oturum süresi dolmuş. Lütfen sınavı yeniden oluşturun.");
+        }
+      } else {
+        alert("Yükleme hatası: " + (e.response?.data?.detail || e.message));
+      }
     }
     setUploading(false);
   };
@@ -1535,7 +1598,7 @@ export default function App() {
             <SetupPage session={session} setSession={setSession} setPage={setPage} />
           </>
         )}
-        {page === "roster" && <RosterPage session={session} setPage={setPage} />}
+        {page === "roster" && <RosterPage session={session} setSession={setSession} setPage={setPage} />}
         {page === "scan" && <ScanPage session={session} setResults={setResults} results={results} />}
         {page === "review" && <ReviewPage session={session} results={results} />}
         {page === "results" && <ResultsPage session={session} results={results} />}
