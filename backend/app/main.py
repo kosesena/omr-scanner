@@ -209,8 +209,24 @@ def delete_result_endpoint(session_id: str, result_index: int):
     session = sessions[session_id]
     if result_index < 0 or result_index >= len(session.results):
         raise HTTPException(404, "Result not found")
-    session.results.pop(result_index)
+    removed = session.results.pop(result_index)
     delete_form_image(session_id, result_index)
+    # Remove from pending review
+    if result_index in session.pending_review:
+        session.pending_review.remove(result_index)
+    # Update pending_review indices (shift down indices above the removed one)
+    session.pending_review = [i if i < result_index else i - 1 for i in session.pending_review]
+    # Clear score from roster if this result was matched to a student
+    if removed.student_number and removed.student_number.text:
+        for student in session.roster.students:
+            if student.scan_index == result_index:
+                student.score = None
+                student.correct_count = 0
+                student.total_questions = 0
+                student.scan_index = None
+                student.verified = False
+            elif student.scan_index is not None and student.scan_index > result_index:
+                student.scan_index -= 1  # shift indices
     save_session(session)
     return {"message": "Result deleted"}
 
