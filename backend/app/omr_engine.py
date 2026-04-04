@@ -483,12 +483,21 @@ class OMREngine:
         """Grade answers against answer key."""
         correct = 0
         total = len(answer_key)
+        mismatches = []
         for q_num, correct_ans in answer_key.items():
             q = int(q_num)
-            student_ans = answers.get(q, "")
+            # Try both int and string keys for robustness
+            student_ans = answers.get(q, answers.get(str(q), ""))
             if student_ans and student_ans.upper() == correct_ans.upper():
                 correct += 1
+            else:
+                mismatches.append(f"Q{q}: student='{student_ans}' key='{correct_ans}'")
         score = (correct / total * 100) if total > 0 else 0
+        if mismatches:
+            logger.info(f"Grade mismatches ({len(mismatches)}): {mismatches[:5]}")
+        logger.info(f"Grade result: {correct}/{total} = {score:.1f}% "
+                     f"(answer_key_types: {type(list(answer_key.keys())[0]) if answer_key else '?'}, "
+                     f"answers_types: {type(list(answers.keys())[0]) if answers else '?'})")
         return score, correct, total
 
     def scan(self, image: np.ndarray, answer_key: dict = None,

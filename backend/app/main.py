@@ -526,8 +526,16 @@ def _process_scan_inner(image: np.ndarray, answer_key: dict = None,
     detected_booklet = "A"
     if use_booklet and engine.last_warped_gray is not None:
         detected_booklet = engine.read_booklet(engine.last_warped_gray)
+        logger.info(f"Booklet detected: {detected_booklet}, answer_key_b exists: {answer_key_b is not None}")
         if detected_booklet == "B" and answer_key_b:
-            omr_result = engine.scan(image, answer_key=answer_key_b, debug=False)
+            # Re-grade existing answers with booklet B key (don't re-scan)
+            logger.info(f"Re-grading with booklet B key: {dict(list(answer_key_b.items())[:3])}...")
+            logger.info(f"Student answers: {dict(list(omr_result.answers.items())[:3])}...")
+            score, correct, total = engine.grade(omr_result.answers, answer_key_b)
+            omr_result.score = score
+            omr_result.correct_count = correct
+            omr_result.total_questions = total
+            logger.info(f"Booklet B grade: {correct}/{total} = {score:.1f}%")
 
     if not omr_result.success:
         return ScanResponse(
