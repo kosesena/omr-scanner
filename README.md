@@ -316,30 +316,37 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 <br>
 
-## Optik Form Yapısı
+## Ekran Görüntüleri
 
-```
-+--------------------------------------------------+
-|  [ArUco 0]                          [ArUco 1]    |
-|                                                  |
-|              SINAV OPTİK FORMU                   |
-|              Ders: MAT101                        |
-|                                                  |
-|   AD      [_][_][_][_][_][_]...[_]    (20 kutu)  |
-|   SOYAD   [_][_][_][_][_][_]...[_]    (20 kutu)  |
-|   NO      [_][_][_][_][_][_][_][_][_]            |
-|                            KİTAPÇIK:  (A)  (B)   |
-|                                                  |
-|   [QR KOD]                                       |
-|                                                  |
-|          A    B    C    D    E                    |
-|     1.  (A)  (B)  (C)  (D)  (E)                  |
-|     2.  (A)  (B)  (C)  (D)  (E)                  |
-|     ...           5'li gruplar halinde            |
-|                                                  |
-|  [ArUco 2]                          [ArUco 3]    |
-+--------------------------------------------------+
-```
+<div align="center">
+
+<img src="docs/sinav_olusturma.png" alt="Sınav Oluşturma Ekranı" width="700">
+
+<br>
+
+<sub>Sınav oluşturma: soru sayısı, şık sayısı, ders kodu ve kitapçık ayarları</sub>
+
+<br><br>
+
+<img src="docs/optik_form_ornek.png" alt="Örnek Optik Form — 20 Soru, 5 Şık, MAT101" width="420">
+
+<br>
+
+<sub>Oluşturulan yazdırılabilir optik form: 20 soru, A-B-C-D-E şıkları, MAT101 ders kodu</sub>
+
+</div>
+
+**Form üzerindeki bileşenler:**
+
+| Bileşen | Konum | Açıklama |
+|---------|-------|----------|
+| **ArUco İşaretleri** | 4 köşe | Perspektif düzeltme için hizalama referansları (DICT_4X4_50) |
+| **Başlık** | Üst orta | "SINAV OPTİK FORMU" + soru sayısı |
+| **Ad / Soyad kutuları** | Üst bölüm | 20'şer karakter kutusu (el yazısı OCR ile okunur) |
+| **Öğrenci No kutuları** | Üst bölüm | 9 haneli numara kutusu |
+| **Kitapçık A/B** | Üst sağ | İki balon — otomatik algılanır |
+| **QR Kod** | Sol üst (soruların üstü) | Sınav ID, ders kodu, soru sayısı kodlanır |
+| **Cevap balonları** | Ana alan | 5'li gruplar halinde, her satırda A-B-C-D-(E) |
 
 <br>
 
