@@ -32,15 +32,12 @@ async def get_current_user(
 
     token = credentials.credentials
     try:
-        # Peek at the token header to see which algorithm is used
-        header = jwt.get_unverified_header(token)
-        alg = header.get("alg", "HS256")
-        logger.info(f"JWT header alg: {alg}")
-
+        # Always verify with HS256 using legacy JWT secret
+        # Token header may say RS256 but legacy secret is for HS256
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
-            algorithms=[alg, "HS256", "HS384", "HS512"],
+            algorithms=["HS256"],
             options={"verify_aud": False},
         )
         user_id = payload.get("sub")
@@ -52,7 +49,6 @@ async def get_current_user(
         logger.info(f"Auth OK: user_id={user_id}")
         return user_id
     except jwt.ExpiredSignatureError:
-        logger.warning("Token expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Oturum süresi doldu, tekrar giriş yapın",
