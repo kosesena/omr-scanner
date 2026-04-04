@@ -1,109 +1,105 @@
+<div align="center">
+
 # OMR Scanner
 
-**Optik Form Okuyucu ve El Yazısı Tanıma Sistemi**
+**Optik Form Okuyucu ve El Yazisi Tanima Sistemi**
 
-Sınav kağıtlarını telefon kamerasıyla tarayan, optik formu okuyan, el yazısı karakter kutularından öğrenci bilgilerini çıkaran ve sınıf listesiyle eşleştirerek otomatik notlandıran web tabanlı sistem.
+Sinav kagitlarini telefon kamerasiyla tarayan, optik formu okuyan, el yazisi karakter kutularindan ogrenci bilgilerini cikaran ve sinif listesiyle eslestirerek otomatik notlandiran web tabanli sistem.
 
-`React` · `FastAPI` · `OpenCV` · `Supabase` · `OCR`
+[![React](https://img.shields.io/badge/React_19-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![OpenCV](https://img.shields.io/badge/OpenCV_4.10-5C3EE8?style=flat&logo=opencv&logoColor=white)](https://opencv.org)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
+[![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel&logoColor=white)](https://vercel.com)
+[![Render](https://img.shields.io/badge/Render-46E3B7?style=flat&logo=render&logoColor=white)](https://render.com)
+
+[Canli Demo](https://omr-scanner-ng7f273w1-sena-koses-projects.vercel.app) · [API Dokumantasyonu](#api-referansi)
+
+</div>
 
 ---
 
-## Özellikler
+## Ozellikler
 
-### Form Oluşturma
+### Form Olusturma
+- **Optik Form Olusturucu** — A4 PDF formatinda yazdirilabilir sinav formu. ArUco hizalama isaretleri, QR kod, karakter kutulari ve balon cevap alanlari icerir.
+- **Esnek Soru Sayisi** — 5 ile 200 arasi soru destegi
+- **Sik Secenegi** — A-B-C-D (4 sik) veya A-B-C-D-E (5 sik)
+- **Kitapcik A/B Destegi** — Opsiyonel kitapcik secici; kapaliysa formda gosterilmez
+- **Ders Kodu** — Formun basliginda ve QR kodunda ders kodu bilgisi
 
-- **Optik Form Oluşturucu** — A4 PDF formatında yazdırılabilir sınav formu. ArUco hizalama işaretleri, QR kod, karakter kutuları ve balon cevap alanları içerir.
-- **Esnek Soru Sayısı** — 5 ile 200 arası soru desteği
-- **Şık Seçeneği** — A-B-C-D (4 şık) veya A-B-C-D-E (5 şık)
-- **Kitapçık A/B Desteği** — Opsiyonel kitapçık seçici; kapalıysa formda gösterilmez
-- **Ders Kodu** — Formun başlığında ve QR kodunda ders kodu bilgisi
+### Tarama ve Tanima
+- **Kamera ile Tarama** — Telefon kamerasini kullanarak optik form okuma veya fotograf yukleme
+- **OMR Motoru** — OpenCV tabanli balon algilama, ArUco kose isaretleri ile perspektif duzeltme ve adaptif esikleme
+- **Gelismis Marker Algilama** — 8 farkli on-isleme stratejisi (CLAHE, blur, golge normalizasyon, adaptif esik, Otsu, keskinlestirme) ve coklu olcek (0.5x, 0.75x, 1.0x, 1.25x) ile yuksek basari orani
+- **OCR Motoru** — Karakter kutularindan el yazisi tanima (ad, soyad, ogrenci no)
+- **QR Kod Okuma** — Formdan sinav bilgilerini (sinav ID, ders kodu, soru sayisi) otomatik okuma
+- **Kitapcik Algilama** — Taranan formda A/B kitapcik balonunu otomatik tespit ederek dogru cevap anahtariyla notlandirma
+- **Manuel Kitapcik Duzeltme** — Dogrulama ekraninda kitapcik A/B manuel degistirilebilir, otomatik yeniden notlandirma yapilir
+- **Form Gorseli Kaydetme** — Her taranan ogrencinin optik form gorseli Supabase Storage'da kalici olarak saklanir
 
-### Tarama ve Tanıma
+### Kullanici Yonetimi
+- **Ogretmen Girisi** — E-posta ve sifre ile giris/kayit (Supabase Auth)
+- **Veri Izolasyonu** — Her ogretmen sadece kendi sinavlarini gorur ve yonetir
+- **Guvenli Oturum** — JWT tabanli kimlik dogrulama (RS256/HS256), JWKS ile otomatik anahtar yonetimi
 
-- **Kamera ile Tarama** — Telefon kamerasını kullanarak optik form okuma veya fotoğraf yükleme
-- **OMR Motoru** — OpenCV tabanlı balon algılama, ArUco köşe işaretleri ile perspektif düzeltme ve adaptif eşikleme
-- **Gelişmiş Marker Algılama** — 8 farklı ön-işleme stratejisi (CLAHE, blur, gölge normalizasyon, adaptif eşik, Otsu, keskinleştirme) ve çoklu ölçek (0.5x, 0.75x, 1.0x, 1.25x) ile yüksek başarı oranı
-- **OCR Motoru** — Karakter kutularından el yazısı tanıma (ad, soyad, öğrenci no)
-- **QR Kod Okuma** — Formdan sınav bilgilerini (sınav ID, ders kodu, soru sayısı) otomatik okuma
-- **Kitapçık Algılama** — Taranan formda A/B kitapçık balonunu otomatik tespit ederek doğru cevap anahtarıyla notlandırma
-- **Manuel Kitapçık Düzeltme** — Doğrulama ekranında kitapçık A/B manuel değiştirilebilir, otomatik yeniden notlandırma yapılır
-- **Form Görseli Kaydetme** — Her taranan öğrencinin optik form görseli Supabase Storage'da kalıcı olarak saklanır
+### Sinif Yonetimi
+- **Sinif Listesi** — Manuel giris, toplu yapistirma veya PDF yukleme ile ogrenci listesi olusturma
+- **Otomatik Eslestirme** — Taranan kagitlari ogrenci numarasi veya isim ile sinif listesine eslestirme
+- **Manuel Dogrulama** — Tum taramalar ogretmen onayindan gecer; ad, soyad, numara ve kitapcik duzenlenebilir
 
-### Kullanıcı Yönetimi
+### Notlandirma ve Analiz
+- **Otomatik Notlandirma** — Cevap anahtarina gore anlik puanlama
+- **Istatistikler** — Sinif ortalamasi, en yuksek ve en dusuk puan, puan dagilimi, soru bazli dogru orani analizi
+- **CSV Disa Aktarma** — Tum sonuclari (ogrenci bilgileri, puanlar, cevaplar) CSV dosyasi olarak indirme
 
-- **Öğretmen Girişi** — E-posta ve şifre ile giriş/kayıt (Supabase Auth)
-- **Veri İzolasyonu** — Her öğretmen sadece kendi sınavlarını görür ve yönetir
-- **Güvenli Oturum** — JWT tabanlı kimlik doğrulama, otomatik token yenileme
-
-### Sınıf Yönetimi
-
-- **Sınıf Listesi** — Manuel giriş, toplu yapıştırma veya PDF yükleme ile öğrenci listesi oluşturma
-- **Otomatik Eşleştirme** — Taranan kağıtları öğrenci numarası veya isim ile sınıf listesine eşleştirme
-- **Manuel Doğrulama** — Tüm taramalar öğretmen onayından geçer; ad, soyad, numara ve kitapçık düzenlenebilir
-
-### Notlandırma ve Analiz
-
-- **Otomatik Notlandırma** — Cevap anahtarına göre anlık puanlama
-- **İstatistikler** — Sınıf ortalaması, en yüksek ve en düşük puan, puan dağılımı, soru bazlı doğru oranı analizi
-- **CSV Dışa Aktarma** — Tüm sonuçları (öğrenci bilgileri, puanlar, cevaplar) CSV dosyası olarak indirme
-
-### Veri Yönetimi
-
-- **Supabase Entegrasyonu** — Sınav oturumları PostgreSQL'de, form görselleri Supabase Storage'da kalıcı olarak saklanır. Sunucu yeniden başlatılsa veya deploy edilse bile veriler korunur.
-- **SQLite Fallback** — Supabase yapılandırılmamışsa yerel SQLite veritabanı kullanılır (geliştirme modu)
-- **Kayıtlı Sınavlara Devam** — Daha önce oluşturulan sınavlar ders koduyla listelenir, tek tıkla kaldığı yerden devam edilir
-- **Çoklu Sınav Desteği** — Aynı anda birden fazla sınav oturumu oluşturulabilir ve yönetilebilir
-- **Sınav ve Sonuç Silme** — Sınavlar tamamen silinebilir veya tek tek tarama sonuçları kaldırılabilir
+### Veri Yonetimi
+- **Supabase Entegrasyonu** — Sinav oturumlari PostgreSQL'de, form gorselleri Supabase Storage'da kalici olarak saklanir. Sunucu yeniden baslatilsa veya deploy edilse bile veriler korunur.
+- **SQLite Fallback** — Supabase yapilandirilmamissa yerel SQLite veritabani kullanilir (gelistirme modu)
+- **Kayitli Sinavlara Devam** — Daha once olusturulan sinavlar ders koduyla listelenir, tek tikla kaldigi yerden devam edilir
+- **Coklu Sinav Destegi** — Ayni anda birden fazla sinav oturumu olusturulabilir ve yonetilebilir
+- **Sinav ve Sonuc Silme** — Sinavlar tamamen silinebilir veya tek tek tarama sonuclari kaldirilabilir
 
 ### Formlar Galerisi
+- **Formlar Sayfasi** — Taranan tum optik formlarin grid gorunumunde listelenmesi
+- **Buyuk Goruntuleme** — Forma tiklayarak tam boyut modal goruntusu
+- **Form Indirme** — Her form gorseli ayri ayri indirilebilir
 
-- **Formlar Sayfası** — Taranan tüm optik formların grid görünümünde listelenmesi
-- **Büyük Görüntüleme** — Forma tıklayarak tam boyut modal görüntüsü
-- **Form İndirme** — Her form görseli ayrı ayrı indirilebilir
-
-### Mobil Uyumlu Tasarım
-
-- **Responsive Arayüz** — Masaüstünde geniş tablo, mobilde kart tabanlı görünüm
-- **Mobil Sınıf Listesi** — Küçük ekranlarda özel kart layout'u ile öğrenci listesi
-- **Responsive İstatistikler** — Mobilde kompakt stat kartları
+### Mobil Uyumlu Tasarim
+- **Responsive Arayuz** — Masaustunde genis tablo, mobilde kart tabanli gorunum
+- **Mobil Sinif Listesi** — Kucuk ekranlarda ozel kart layout'u ile ogrenci listesi
+- **Responsive Istatistikler** — Mobilde kompakt stat kartlari
 
 ---
 
 ## Mimari
 
 ```
-┌─────────────────────────┐        ┌────────────────────────────────┐
-│                         │        │                                │
-│   React + Vite          │        │   FastAPI Backend              │
-│   Frontend              │        │                                │
-│                         │        │   ┌────────────────────────┐   │
-│   · Ayarlar             │        │   │  OMR Engine            │   │
-│   · Sınıf Listesi       │  REST  │   │  OpenCV · ArUco        │   │
-│   · Tarama              │◄──────►│   │  Perspektif düzeltme   │   │
-│   · Doğrulama           │        │   │  Balon okuma           │   │
-│   · Sonuçlar            │        │   │  Kitapçık algılama     │   │
-│   · Formlar             │        │   └────────────────────────┘   │
-│                         │        │   ┌────────────────────────┐   │
-│   Vercel                │        │   │  OCR Engine            │   │
-│                         │        │   │  Karakter tanıma       │   │
-└─────────────────────────┘        │   │  Şablon eşleştirme    │   │
-                                   │   └────────────────────────┘   │
-┌─────────────────────────┐        │   ┌────────────────────────┐   │
-│                         │        │   │  Form Generator        │   │
-│   Supabase              │        │   │  ReportLab + QR Code   │   │
-│                         │        │   └────────────────────────┘   │
-│   · Auth (kullanıcılar) │        │   ┌────────────────────────┐   │
-│   · PostgreSQL          │◄───────│   │  QR Reader (pyzbar)    │   │
-│     (oturumlar)         │        │   └────────────────────────┘   │
-│   · Storage             │        │                                │
-│     (form görselleri)   │        │   Render (Docker)              │
-│                         │        │                                │
-└─────────────────────────┘        └────────────────────────────────┘
+                    +---------------------------+
+                    |        Supabase           |
+                    |  Auth / PostgreSQL / Strg  |
+                    +---------------------------+
+                              ^       ^
+                              |       |
+  +-------------------+       |       |       +----------------------------+
+  |                   |       |       |       |                            |
+  |  React + Vite     | REST  |       +-------+  FastAPI Backend           |
+  |  Frontend         +-------+               |                            |
+  |                   |                        |  OMR Engine (OpenCV)       |
+  |  Ayarlar          |                        |  OCR Engine (Tesseract)    |
+  |  Sinif Listesi    |                        |  Form Generator (PDF)      |
+  |  Tarama           |                        |  QR Reader (pyzbar)        |
+  |  Dogrulama        |                        |  Auth (JWT/JWKS)           |
+  |  Sonuclar         |                        |                            |
+  |  Formlar          |                        +----------------------------+
+  |                   |                                    |
+  +-------------------+                              Docker / Render
+        Vercel
 ```
 
 ---
 
-## Hızlı Başlangıç
+## Hizli Baslangic
 
 ### Yerel Kurulum
 
@@ -125,9 +121,9 @@ npm install
 npm run dev
 ```
 
-Tarayıcıda `http://localhost:5173` adresini açın.
+Tarayicida `http://localhost:5173` adresini acin.
 
-> **Not:** Yerel geliştirmede Supabase env var'ları yoksa auth atlanır ve tek kullanıcı modunda çalışır.
+> Yerel gelistirmede Supabase env var'lari yoksa auth atlanir ve tek kullanici modunda calisir.
 
 ### Docker
 
@@ -137,346 +133,304 @@ docker build -t omr-backend .
 docker run -p 8000:8000 omr-backend
 ```
 
-### Ortam Değişkenleri
+---
 
-**Backend (Render)**
+## Ortam Degiskenleri
 
-| Değişken | Varsayılan | Açıklama |
-|----------|-----------|----------|
-| `SUPABASE_URL` | — | Supabase proje URL'si |
-| `SUPABASE_SERVICE_KEY` | — | Supabase service_role anahtarı (legacy JWT formatı `eyJ...`) |
-| `SUPABASE_JWT_SECRET` | — | Supabase JWT Secret (token doğrulama için) |
-| `OMR_DATA_DIR` | `/tmp/omr_data` | SQLite fallback dizini (Supabase yoksa) |
+### Backend (Render)
 
-**Frontend (Vercel)**
+| Degisken | Aciklama |
+|----------|----------|
+| `SUPABASE_URL` | Supabase proje URL'si |
+| `SUPABASE_SERVICE_KEY` | Supabase service_role anahtari (legacy JWT formati `eyJ...`) |
+| `SUPABASE_JWT_SECRET` | Supabase JWT Secret (token dogrulama icin) |
+| `OMR_DATA_DIR` | SQLite fallback dizini (varsayilan: `/tmp/omr_data`) |
 
-| Değişken | Varsayılan | Açıklama |
-|----------|-----------|----------|
-| `VITE_API_URL` | `""` (aynı origin) | Backend API adresi |
-| `VITE_SUPABASE_URL` | — | Supabase proje URL'si |
-| `VITE_SUPABASE_ANON_KEY` | — | Supabase anon (public) anahtarı |
+### Frontend (Vercel)
 
-> **Not:** Supabase Python SDK yeni `sb_secret_...` format anahtarlarla uyumlu değildir. Supabase Dashboard > Settings > API > Service Role Key altındaki `eyJ...` ile başlayan legacy JWT anahtarını kullanın.
+| Degisken | Aciklama |
+|----------|----------|
+| `VITE_API_URL` | Backend API adresi |
+| `VITE_SUPABASE_URL` | Supabase proje URL'si |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon (public) anahtari |
 
 ---
 
-## Kullanım
+## Kullanim
 
-### 1. Kayıt ve Giriş
+### 1. Kayit ve Giris
 
-1. Uygulamayı açın, karşınıza giriş ekranı gelecek
-2. İlk kullanımda **Kayıt Ol** ile e-posta ve şifre belirleyin
-3. Sonraki girişlerde **Giriş Yap** ile devam edin
-4. Her öğretmen sadece kendi sınavlarını görür
+1. Uygulamayi acin, giris ekrani karsilar
+2. Ilk kullanimda **Kayit Ol** ile e-posta ve sifre belirleyin
+3. Sonraki girislerde **Giris Yap** ile devam edin
+4. Her ogretmen sadece kendi sinavlarini gorur
 
-### 2. Sınav Oluşturma
+### 2. Sinav Olusturma
 
 1. **Ayarlar** sekmesine gidin
-2. Soru sayısını seçin (5-200 arası)
-3. Şık sayısını belirleyin (A-B-C-D veya A-B-C-D-E)
-4. Ders kodunu girin (örneğin MAT101)
-5. Kitapçık A/B kullanacaksanız toggle'ı açın
-6. Cevap anahtarını işaretleyin (kitapçık açıksa her iki kitapçık için ayrı ayrı)
-7. **Yazdırılabilir form indir** ile PDF'i indirin ve A4 kağıda yazdırın
-8. **Devam et** ile sınav oturumunu oluşturun
+2. Soru sayisini secin (5-200 arasi)
+3. Sik sayisini belirleyin (A-B-C-D veya A-B-C-D-E)
+4. Ders kodunu girin (ornegin MAT101)
+5. Kitapcik A/B kullanacaksaniz toggle'i acin
+6. Cevap anahtarini isaretleyin (kitapcik aciksa her iki kitapcik icin ayri ayri)
+7. **Yazdirilabilir form indir** ile PDF'i indirin ve A4 kagida yazdirin
+8. **Devam et** ile sinav oturumunu olusturun
 
-### 3. Sınıf Listesi (İsteğe Bağlı)
+### 3. Sinif Listesi (Istege Bagli)
 
-1. **Sınıf** sekmesine gidin
-2. Öğrenci eklemek için üç yöntem:
-   - **Tek tek ekleme** — Ad, Soyad, No alanlarına yazın
-   - **Toplu yapıştırma** — Excel'den kopyala-yapıştır (Ad, Soyad, No formatında)
-   - **PDF yükleme** — Sınıf listesi PDF dosyası yükleyin, otomatik ayıklanır
-3. **Kaydet ve taramaya geç** butonuna basın
+1. **Sinif** sekmesine gidin
+2. Ogrenci eklemek icin uc yontem:
+   - **Tek tek ekleme** — Ad, Soyad, No alanlarina yazin
+   - **Toplu yapistirma** — Excel'den kopyala-yapistir (Ad, Soyad, No formatinda)
+   - **PDF yukleme** — Sinif listesi PDF dosyasi yukleyin, otomatik ayiklanir
+3. **Kaydet ve taramaya gec** butonuna basin
 
 ### 4. Tarama
 
 1. **Tara** sekmesine gidin
-2. Telefon kamerasını açın veya fotoğraf yükleyin
-3. Doldurulan formu çerçeve içine hizalayın (4 köşe işareti görünmeli)
-4. Yakalama butonuna basın
-5. Sonuç anında görünür: puan, cevaplar, öğrenci bilgileri
-6. Her taranan formun görseli otomatik olarak Supabase Storage'a yüklenir
+2. Telefon kamerasini acin veya fotograf yukleyin
+3. Doldurulan formu cerceve icine hizalayin (4 kose isareti gorunmeli)
+4. Yakalama butonuna basin
+5. Sonuc aninda gorunur: puan, cevaplar, ogrenci bilgileri
+6. Her taranan formun gorseli otomatik olarak Supabase Storage'a yuklenir
 
-### 5. Doğrulama
+### 5. Dogrulama
 
-1. **Doğrula** sekmesinde tüm tarama sonuçları listelenir
-2. Taranan form görüntüsü ile birlikte ad, soyad ve numara düzenlenebilir
-3. Kitapçık yanlış algılandıysa A/B butonu ile değiştirilir (puan otomatik yeniden hesaplanır)
-4. Onaylayınca öğrenci sınıf listesiyle eşleştirilir ve notu kaydedilir
+1. **Dogrula** sekmesinde tum tarama sonuclari listelenir
+2. Taranan form goruntusu ile birlikte ad, soyad ve numara duzenlenebilir
+3. Kitapcik yanlis algilandiysa A/B butonu ile degistirilir (puan otomatik yeniden hesaplanir)
+4. Onaylayinca ogrenci sinif listesiyle eslestirilir ve notu kaydedilir
 
 ### 6. Formlar
 
-1. **Formlar** sekmesinde taranan tüm optik formlar grid görünümünde listelenir
-2. Forma tıklayarak büyük görüntü açılır
-3. İndirme butonu ile form görseli kaydedilebilir
+1. **Formlar** sekmesinde taranan tum optik formlar grid gorunumunde listelenir
+2. Forma tiklayarak buyuk goruntu acilir
+3. Indirme butonu ile form gorseli kaydedilebilir
 
-### 7. Sonuçlar ve Analiz
+### 7. Sonuclar ve Analiz
 
-1. **Sonuçlar** sekmesinde:
-   - Sınıf ortalaması, en yüksek ve en düşük puan
-   - Puan dağılımı
-   - Soru bazlı doğru oranı analizi
-   - Sınıf listesi yüklediyseniz her öğrencinin notu
-   - Tüm taranan kağıtların detaylı sonuçları
-2. CSV olarak dışa aktarabilirsiniz
-3. Tek tek tarama sonuçlarını veya tüm sınavı silebilirsiniz
+1. **Sonuclar** sekmesinde sinif ortalamasi, en yuksek/dusuk puan, puan dagilimi ve soru bazli analiz goruntulenir
+2. Sinif listesi yuklediyseniz her ogrencinin notu listelenir
+3. CSV olarak disa aktarabilirsiniz
+4. Tek tek tarama sonuclarini veya tum sinavi silebilirsiniz
 
-### 8. Kayıtlı Sınava Devam Etme
+### 8. Kayitli Sinava Devam Etme
 
-1. **Ayarlar** sekmesinde **Kayıtlı Sınavlar** listesi görünür
-2. Ders kodu, soru sayısı ve taranan öğrenci sayısı gösterilir
-3. Tıklayarak sınava kaldığı yerden devam edebilirsiniz
-4. Tüm veriler (cevap anahtarı, sınıf listesi, tarama sonuçları, form görselleri) korunur
+1. **Ayarlar** sekmesinde **Kayitli Sinavlar** listesi gorunur
+2. Ders kodu, soru sayisi ve taranan ogrenci sayisi gosterilir
+3. Tiklayarak sinava kaldigi yerden devam edebilirsiniz
 
 ---
 
-## Optik Form Yapısı
+## Optik Form Yapisi
 
 ```
-┌──────────────────────────────────────────────┐
-│  [ArUco 0]                      [ArUco 1]    │
-│                                              │
-│            SINAV OPTİK FORMU                 │
-│            Ders: MAT101                      │
-│                                              │
-│   AD      [_][_][_][_][_]...[_]   (20 kutu)  │
-│   SOYAD   [_][_][_][_][_]...[_]   (20 kutu)  │
-│   NO      [_][_][_][_][_][_][_][_][_]        │
-│                          KİTAPÇIK: (A) (B)   │
-│                                              │
-│   [QR KOD]                                   │
-│   (sınav ID, ders kodu, soru sayısı)         │
-│                                              │
-│         A    B    C    D    E                 │
-│    1.  (A)  (B)  (C)  (D)  (E)               │
-│    2.  (A)  (B)  (C)  (D)  (E)               │
-│    ...          5'li gruplar halinde          │
-│                                              │
-│  [ArUco 2]                      [ArUco 3]    │
-└──────────────────────────────────────────────┘
++----------------------------------------------+
+|  [ArUco 0]                      [ArUco 1]    |
+|                                              |
+|            SINAV OPTIK FORMU                 |
+|            Ders: MAT101                      |
+|                                              |
+|   AD      [_][_][_][_][_]...[_]   (20 kutu)  |
+|   SOYAD   [_][_][_][_][_]...[_]   (20 kutu)  |
+|   NO      [_][_][_][_][_][_][_][_][_]        |
+|                          KITAPCIK: (A) (B)   |
+|                                              |
+|   [QR KOD]                                   |
+|                                              |
+|         A    B    C    D    E                 |
+|    1.  (A)  (B)  (C)  (D)  (E)               |
+|    2.  (A)  (B)  (C)  (D)  (E)               |
+|    ...          5'li gruplar halinde          |
+|                                              |
+|  [ArUco 2]                      [ArUco 3]    |
++----------------------------------------------+
 ```
 
-**Form özellikleri:**
-
-- Sütun başlıkları (A B C D E) her sütunun üstünde görünür
-- 5'li gruplar halinde satır ayırıcıları
-- Alternatif satır arka planları (kolay okuma için)
-- Kitapçık seçici opsiyonel (kapalıysa formda gösterilmez)
-- Footer: Made by Sena Köse
+- Sutun basliklari her sutunun ustunde gorunur
+- 5'li gruplar halinde satir ayiricilari
+- Alternatif satir arka planlari
+- Kitapcik secici opsiyonel
+- Footer: Made by Sena Kose
 
 ---
 
-## OMR Nasıl Çalışır
+## OMR Pipeline
 
-1. **ArUco Algılama** — 4 köşe işareti OpenCV ArUco modülü ile bulunur. 8 farklı ön-işleme stratejisi (CLAHE, blur, gölge normalizasyon, adaptif eşik, Otsu, keskinleştirme, güçlü CLAHE, ham gri) birleştirilerek maksimum algılama sağlanır.
-2. **Çoklu Ölçek** — İşaretler bulunamazsa görüntü 0.75x, 1.25x ve 0.5x ölçeklerde yeniden taranır
-3. **Perspektif Düzeltme** — Görüntü düz hale getirilir (açı ve eğiklik düzeltmesi)
-4. **Adaptif Eşikleme** — Farklı ışık koşullarında çalışabilmek için
-5. **Balon Analizi** — Her balon bölgesinin doluluk oranı hesaplanır
-6. **Karar Mantığı** — Doluluk %35'in üzerindeyse işaretli kabul edilir; birden fazla işaretlenmişse en yüksek seçilir veya belirsiz olarak işaretlenir
-7. **Kitapçık Algılama** — NO satırındaki A/B balonları okunarak doğru cevap anahtarı seçilir
-8. **OCR** — Karakter kutularından şablon eşleştirme ve kontür analizi ile harf/rakam tanıma
-9. **QR Okuma** — pyzbar ile formdan sınav bilgileri çıkartılır
+| Adim | Islem | Detay |
+|------|-------|-------|
+| 1 | ArUco Algilama | 4 kose isareti, 8 on-isleme stratejisi, coklu olcek |
+| 2 | Perspektif Duzeltme | Aci ve egiklik duzeltmesi |
+| 3 | Adaptif Esikleme | Farkli isik kosullarina uyum |
+| 4 | Balon Analizi | Her balon bolgesinin doluluk orani |
+| 5 | Karar Mantigi | %35 esik, belirsiz isaretleme tespiti |
+| 6 | Kitapcik Algilama | A/B balon okuma |
+| 7 | OCR | Sablon eslestirme + kontur analizi |
+| 8 | QR Okuma | pyzbar ile sinav meta verisi |
 
 ---
 
-## Teknoloji Yığını
+## Teknoloji Yigini
 
-| Bileşen | Teknoloji |
-|---------|-----------|
-| Frontend | React 19, Vite 8, Tailwind CSS 4 |
-| Backend | Python 3.11, FastAPI |
-| Kimlik Doğrulama | Supabase Auth (JWT) |
-| OMR Motoru | OpenCV 4.10 (ArUco + adaptif eşikleme + çoklu ön-işleme) |
-| OCR Motoru | OpenCV şablon eşleştirme + kontür analizi |
-| QR Kod | qrcode (oluşturma), pyzbar (okuma) |
-| PDF Oluşturma | ReportLab (DejaVuSans — Türkçe karakter desteği) |
-| PDF Ayıklama | pdfplumber (sınıf listesi PDF okuma) |
-| Veritabanı | Supabase PostgreSQL (kalıcı depolama) + SQLite (fallback) |
-| Görsel Depolama | Supabase Storage (form görselleri) |
+| Katman | Teknoloji |
+|--------|-----------|
+| Frontend | React 19, Vite 8, Tailwind CSS 4, lucide-react |
+| Backend | Python 3.11, FastAPI, uvicorn |
+| Kimlik Dogrulama | Supabase Auth, JWT (RS256/HS256), JWKS |
+| Goruntu Isleme | OpenCV 4.10, ArUco, adaptif esikleme |
+| Karakter Tanima | OpenCV sablon eslestirme, kontur analizi |
+| QR Kod | qrcode (olusturma), pyzbar (okuma) |
+| PDF | ReportLab (DejaVuSans), pdfplumber |
+| Veritabani | Supabase PostgreSQL + SQLite fallback |
+| Depolama | Supabase Storage (form gorselleri) |
 | Kamera | react-webcam |
 | HTTP | axios |
-| İkonlar | lucide-react |
-| Dağıtım | Render (backend, Docker), Vercel (frontend) |
+| Dagitim | Render (Docker), Vercel |
 
 ---
 
-## Proje Yapısı
+## Proje Yapisi
 
 ```
 omr-scanner/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py               FastAPI endpoint'leri
-│   │   ├── auth.py               JWT kimlik doğrulama
-│   │   ├── omr_engine.py         OpenCV OMR işleme (marker algılama, balon okuma, kitapçık)
-│   │   ├── ocr_engine.py         Karakter tanıma motoru
+│   │   ├── auth.py               JWT/JWKS kimlik dogrulama
+│   │   ├── omr_engine.py         OpenCV OMR isleme
+│   │   ├── ocr_engine.py         Karakter tanima motoru
 │   │   ├── qr_reader.py          QR kod okuyucu
-│   │   ├── form_generator.py     PDF form oluşturucu
-│   │   ├── storage.py            Supabase + SQLite depolama katmanı
-│   │   └── models.py             Pydantic şemaları
+│   │   ├── form_generator.py     PDF form olusturucu
+│   │   ├── storage.py            Supabase + SQLite depolama
+│   │   └── models.py             Pydantic semalari
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx               Ana React uygulaması (tek dosya)
-│   │   ├── main.jsx              Giriş noktası
+│   │   ├── App.jsx               Ana React uygulamasi
+│   │   ├── main.jsx              Giris noktasi
 │   │   └── index.css             Tailwind stilleri
 │   ├── package.json
 │   └── vercel.json
-├── sample_forms/                  Örnek optik formlar
 └── README.md
 ```
 
 ---
 
-## API Referansı
+## API Referansi
 
-> Tüm `/api/sessions/*`, `/api/scan/*` endpoint'leri `Authorization: Bearer <token>` header'ı gerektirir. Form oluşturma endpoint'leri herkese açıktır.
+> Tum `/api/sessions/*` ve `/api/scan/*` endpoint'leri `Authorization: Bearer <token>` header'i gerektirir. Form olusturma endpoint'leri herkese aciktir.
 
-### Oturum Yönetimi
+### Oturum Yonetimi
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `POST` | `/api/sessions/create` | Sınav oturumu oluştur |
-| `GET` | `/api/sessions` | Kullanıcının kayıtlı sınavlarını listele |
-| `GET` | `/api/sessions/{id}` | Oturum detaylarını getir |
-| `DELETE` | `/api/sessions/{id}` | Sınavı ve tüm verilerini sil |
-| `DELETE` | `/api/sessions/{id}/results/{index}` | Tek bir tarama sonucunu sil |
+| `POST` | `/api/sessions/create` | Sinav oturumu olustur |
+| `GET` | `/api/sessions` | Kullanicinin sinavlarini listele |
+| `GET` | `/api/sessions/{id}` | Oturum detaylari |
+| `DELETE` | `/api/sessions/{id}` | Sinavi sil |
+| `DELETE` | `/api/sessions/{id}/results/{idx}` | Tek tarama sonucunu sil |
 
-### Form Oluşturma (Auth gerektirmez)
+### Form Olusturma
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `GET` | `/api/forms/download/{n}` | Boş form PDF indir |
-| `POST` | `/api/forms/generate` | Özel form oluştur |
+| `GET` | `/api/forms/download/{n}` | Bos form PDF indir |
+| `POST` | `/api/forms/generate` | Ozel form olustur |
 
 ### Tarama
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `POST` | `/api/scan` | Yüklenen görüntüden tara (dosya yükleme) |
-| `POST` | `/api/scan/base64` | Base64 görüntüden tara (kamera yakalama) |
+| `POST` | `/api/scan` | Dosya yukleyerek tara |
+| `POST` | `/api/scan/base64` | Base64 goruntuden tara |
 
-### Sınıf Listesi
+### Sinif Listesi
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `POST` | `/api/sessions/{id}/roster` | Sınıf listesi yükle (JSON) |
-| `POST` | `/api/sessions/{id}/roster/pdf` | Sınıf listesi yükle (PDF) |
-| `GET` | `/api/sessions/{id}/roster` | Sınıf listesini getir |
+| `POST` | `/api/sessions/{id}/roster` | Sinif listesi yukle (JSON) |
+| `POST` | `/api/sessions/{id}/roster/pdf` | Sinif listesi yukle (PDF) |
+| `GET` | `/api/sessions/{id}/roster` | Sinif listesini getir |
 
-### Doğrulama
+### Dogrulama
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `GET` | `/api/sessions/{id}/review` | Doğrulama bekleyen taramaları getir |
-| `POST` | `/api/sessions/{id}/verify` | OCR sonucunu düzenle, kitapçık değiştir ve onayla |
+| `GET` | `/api/sessions/{id}/review` | Dogrulama bekleyenleri getir |
+| `POST` | `/api/sessions/{id}/verify` | Sonucu duzenle ve onayla |
 
-### Sonuçlar ve Analiz
+### Sonuclar
 
-| Metod | Endpoint | Açıklama |
+| Metod | Endpoint | Aciklama |
 |-------|----------|----------|
-| `GET` | `/api/sessions/{id}/stats` | Sınav istatistikleri |
-| `GET` | `/api/sessions/{id}/export` | Sonuçları CSV olarak indir |
+| `GET` | `/api/sessions/{id}/stats` | Sinav istatistikleri |
+| `GET` | `/api/sessions/{id}/export` | CSV disa aktarma |
 
 ---
 
-## Yapılandırma
+## Yapilandirma
 
-### OMR Motoru — `omr_engine.py`
+### OMR Motoru
 
-| Parametre | Varsayılan | Açıklama |
+| Parametre | Varsayilan | Aciklama |
 |-----------|-----------|----------|
-| `fill_threshold` | 0.35 | Balonun işaretli sayılması için minimum doluluk oranı |
-| `ambiguity_threshold` | 0.15 | En yüksek iki balon arasındaki minimum fark |
-| `ARUCO_DICT_TYPE` | `DICT_4X4_50` | ArUco sözlük tipi |
+| `fill_threshold` | 0.35 | Balon doluluk esigi |
+| `ambiguity_threshold` | 0.15 | Belirsizlik esigi |
+| `ARUCO_DICT_TYPE` | `DICT_4X4_50` | ArUco sozluk tipi |
 
-### OCR Motoru — `ocr_engine.py`
+### OCR Motoru
 
-| Parametre | Varsayılan | Açıklama |
+| Parametre | Varsayilan | Aciklama |
 |-----------|-----------|----------|
-| `empty_threshold` | 0.03 | Kutunun boş sayılması için eşik değeri |
-| `REVIEW_THRESHOLD` | 0.6 | Bu güvenin altındaki sonuçlar doğrulama gerektirir |
+| `empty_threshold` | 0.03 | Bos kutu esigi |
+| `REVIEW_THRESHOLD` | 0.6 | Dogrulama gerektiren guven esigi |
 
-### Form Oluşturucu — `form_generator.py`
+### Form Olusturucu
 
-| Parametre | Varsayılan | Açıklama |
+| Parametre | Varsayilan | Aciklama |
 |-----------|-----------|----------|
-| `num_questions` | 40 | Soru sayısı (5-200) |
-| `options` | A, B, C, D, E | Şık listesi |
-| `show_booklet` | true | Kitapçık seçicisini göster veya gizle |
-| `name_boxes` | 20 | Ad için karakter kutusu sayısı |
-| `surname_boxes` | 20 | Soyad için karakter kutusu sayısı |
-| `student_no_boxes` | 9 | Öğrenci numarası için kutu sayısı |
+| `num_questions` | 40 | Soru sayisi (5-200) |
+| `options` | A, B, C, D, E | Sik listesi |
+| `show_booklet` | true | Kitapcik secicisi |
+| `name_boxes` | 20 | Ad kutu sayisi |
+| `surname_boxes` | 20 | Soyad kutu sayisi |
+| `student_no_boxes` | 9 | Numara kutu sayisi |
 
 ---
 
 ## Sorun Giderme
 
-**4 işaret bulunamadı / Perspektif düzeltme başarısız**
-- 4 köşe işaretinin tamamının görüntüde göründüğünden emin olun
-- İşaretler üzerinde gölge olmasın
-- Kamerayı yaklaşık 30 cm yükseklikten sabit tutun
-- Hata mesajında hangi marker'ların eksik olduğu gösterilir (örn. "Köşe işaretçileri eksik: 2 (sol alt)")
-- Sistem 8 farklı ön-işleme ve 4 farklı ölçek dener; yine de başarısızsa kağıt düzlüğünü kontrol edin
-
-**Kitapçık yanlış algılandı**
-- Doğrulama ekranında A/B butonuyla kitapçığı manuel değiştirebilirsiniz
-- Değiştirince puan doğru cevap anahtarıyla yeniden hesaplanır
-
-**Düşük doğruluk**
-- Koyu kalem veya tükenmez ile balonları tamamen doldurun
-- İyi ve düz aydınlatma sağlayın
-- Buruşuk veya katlanmış kağıt kullanmayın
-
-**Kamera çalışmıyor**
-- Tarayıcıda kamera iznini verin
-- HTTPS veya localhost kullanın (kamera güvenli bağlam gerektirir)
-
-**Türkçe karakterler formda görünmüyor**
-- Backend'de `fonts-dejavu-core` paketinin yüklü olduğunu kontrol edin
-- Docker kullanıyorsanız Dockerfile'da zaten mevcut
-
-**Veriler kayboldu**
-- Supabase yapılandırılmışsa veriler kalıcı olarak saklanır
-- Supabase yoksa `OMR_DATA_DIR` değişkeninin kalıcı bir dizine işaret ettiğinden emin olun
-- Render free tier'da dosya sistemi geçicidir; kalıcı depolama için Supabase kullanın
-
-**Supabase bağlantı hatası**
-- `SUPABASE_SERVICE_KEY` olarak legacy JWT formatını kullanın (`eyJ...` ile başlamalı)
-- Yeni `sb_secret_...` formatı Python SDK ile uyumlu değildir
+| Sorun | Cozum |
+|-------|-------|
+| 4 isaret bulunamadi | 4 kose isaretinin tamami goruntuye girmeli, golge olmamali |
+| Kitapcik yanlis algilandi | Dogrulama ekraninda A/B butonu ile degistirin |
+| Dusuk dogruluk | Koyu kalem kullanin, iyi aydinlatma saglayin |
+| Kamera calismiyor | Tarayicida kamera izni verin, HTTPS kullanin |
+| Turkce karakter sorunu | `fonts-dejavu-core` paketini kontrol edin |
+| Veriler kayboldu | Supabase kullanin, Render free tier gecici dosya sistemi kullanir |
+| Supabase baglanti hatasi | Legacy JWT key kullanin (`eyJ...` formati) |
 
 ---
 
-## Dağıtım
+## Dagitim
 
-### Backend (Render)
+### Backend — Render
 
-1. Render'da yeni bir **Web Service** oluşturun
-2. Docker runtime seçin
-3. Root directory: `backend`
-4. Ortam değişkenlerini ekleyin:
-   - `SUPABASE_URL` = Supabase proje URL'si
-   - `SUPABASE_SERVICE_KEY` = Legacy JWT service_role key
-   - `SUPABASE_JWT_SECRET` = JWT Secret (Settings > JWT Keys > Legacy JWT Secret)
+1. Yeni **Web Service** olusturun (Docker runtime)
+2. Root directory: `backend`
+3. Ortam degiskenleri: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`
 
-### Frontend (Vercel)
+### Frontend — Vercel
 
-1. Vercel'de yeni bir proje oluşturun
-2. Root directory: `frontend`
-3. Build command: `npm run build`
-4. Output directory: `dist`
-5. Ortam değişkenleri:
-   - `VITE_API_URL` = Render backend URL'si
-   - `VITE_SUPABASE_URL` = Supabase proje URL'si
-   - `VITE_SUPABASE_ANON_KEY` = Supabase anon (public) key
+1. Yeni proje olusturun, root: `frontend`
+2. Build: `npm run build`, output: `dist`
+3. Ortam degiskenleri: `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
-### Supabase Kurulumu
+### Supabase
 
-1. Supabase'de yeni bir proje oluşturun
-2. SQL Editor'da tabloyu oluşturun:
+1. Yeni proje olusturun
+2. SQL Editor'da calistirin:
    ```sql
    CREATE TABLE sessions (
      session_id TEXT PRIMARY KEY,
@@ -487,9 +441,8 @@ omr-scanner/
    );
    CREATE INDEX idx_sessions_user_id ON sessions(user_id);
    ```
-3. Storage'da `form-images` bucket'ı oluşturun (public)
-4. Settings > API'den legacy JWT service_role key'i alın
-5. Settings > JWT Keys > Legacy JWT Secret'ı alın
+3. Storage'da `form-images` bucket'i olusturun (public)
+4. Authentication > Providers > Email yapilandirilir
 
 ---
 
@@ -499,4 +452,8 @@ MIT
 
 ---
 
-Öğretmenler için geliştirilmiştir.
+<div align="center">
+
+Crafted with care for teachers by **Sena Kose**
+
+</div>
