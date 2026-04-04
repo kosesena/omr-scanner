@@ -360,6 +360,32 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 </div>
 
+### Mobil Görünüm
+
+<div align="center">
+
+<img src="docs/mobil_ayarlar.jpeg" alt="Mobil — Sınav Oluşturma" width="220">
+&nbsp;&nbsp;
+<img src="docs/mobil_cevap_anahtari.jpeg" alt="Mobil — Cevap Anahtarı" width="220">
+&nbsp;&nbsp;
+<img src="docs/mobil_sonuclar.jpeg" alt="Mobil — Sonuçlar" width="220">
+
+<br>
+
+<sub>Soldan sağa: Sınav oluşturma, Cevap anahtarı, Sonuçlar ve sınıf listesi</sub>
+
+<br><br>
+
+<img src="docs/mobil_sonuclar_detay.jpeg" alt="Mobil — Sonuç Detayları" width="220">
+&nbsp;&nbsp;
+<img src="docs/mobil_formlar.jpeg" alt="Mobil — Taranan Formlar" width="220">
+
+<br>
+
+<sub>Soldan sağa: Taranan öğrenci detay kartları, Formlar galerisi</sub>
+
+</div>
+
 **Form üzerindeki bileşenler:**
 
 | Bileşen | Konum | Açıklama |
