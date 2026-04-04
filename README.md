@@ -308,7 +308,7 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 ### 5 &mdash; Doğrulama
 
-**Doğrula** sekmesinde tüm taramalar listelenir. Taranan form görüntüsü eşliğinde ad, soyad, numara ve kitapçık manuel olarak düzeltilip kaydedilir. Sonuçlar genellikle bu adımda doğrulanarak kesinleştirilir.
+**Doğrula** sekmesinde taranan öğrencilerin numarası ve notu görüntülenir. Yanlış okunan sonuçlar bu ekrandan manuel olarak düzeltilip kaydedilir.
 
 ### 6 &mdash; Sonuçlar ve Analiz
 
