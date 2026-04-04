@@ -334,6 +334,30 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 <sub>Oluşturulan yazdırılabilir optik form: 20 soru, A-B-C-D-E şıkları, MAT101 ders kodu</sub>
 
+<br><br>
+
+<img src="docs/ekran_sonuclar.png" alt="Sonuçlar Ekranı — Sınıf Listesi ve İstatistikler" width="700">
+
+<br>
+
+<sub>Sonuçlar sekmesi: öğrenci sayısı, ortalama, en yüksek/düşük puan ve sınıf listesi</sub>
+
+<br><br>
+
+<img src="docs/ekran_sonuclar_detay.png" alt="Sonuçlar Detay — Öğrenci Kartları" width="700">
+
+<br>
+
+<sub>Taranan öğrencilerin detay kartları: öğrenci no, kitapçık türü, puan ve güven oranı</sub>
+
+<br><br>
+
+<img src="docs/ekran_formlar.png" alt="Formlar Sekmesi — Taranan Optik Formlar" width="700">
+
+<br>
+
+<sub>Formlar sekmesi: taranan optik formların galeri görünümü, her form altında öğrenci no ve puan</sub>
+
 </div>
 
 **Form üzerindeki bileşenler:**
