@@ -44,7 +44,7 @@ OMR Scanner, öğretmenlerin sınav sürecini uçtan uca dijitalleştiren bir we
 ### Form Oluşturma
 - A4 PDF formatında yazdırılabilir sınav formu
 - ArUco hizalama işaretleri, QR kod, karakter kutuları
-- 5 ile 200 arası esnek soru sayısı
+- 20 veya 40 soru sayısı seçeneği
 - 4 şık (A-D) veya 5 şık (A-E) seçeneği
 - Opsiyonel Kitapçık A/B desteği
 - Ders kodu entegrasyonu (başlık + QR)
@@ -223,7 +223,7 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 ### 2 &mdash; Sınav Oluşturma
 
-**Ayarlar** sekmesinden soru sayısını (5-200), şık sayısını (4 veya 5), ders kodunu ve kitapçık tercihini ayarla. Cevap anahtarını işaretleyip **Yazdırılabilir form indir** ile PDF'i al. **Devam et** ile sınav oturumunu başlat.
+**Ayarlar** sekmesinden soru sayısını (20 veya 40), şık sayısını (4 veya 5), ders kodunu ve kitapçık tercihini ayarla. Cevap anahtarını işaretleyip **Yazdırılabilir form indir** ile PDF'i al. **Devam et** ile sınav oturumunu başlat.
 
 ### 3 &mdash; Sınıf Listesi
 
@@ -432,7 +432,7 @@ omr-scanner/
 
 | Parametre | Varsayılan | Açıklama |
 |-----------|:---------:|----------|
-| `num_questions` | 40 | Soru sayısı (5-200) |
+| `num_questions` | 40 | Soru sayısı (20 veya 40) |
 | `options` | A, B, C, D, E | Şık listesi |
 | `show_booklet` | true | Kitapçık seçicisi görünsün mü |
 | `name_boxes` | 20 | Ad karakter kutusu sayısı |
