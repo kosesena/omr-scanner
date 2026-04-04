@@ -92,28 +92,101 @@ OMR Scanner, öğretmenlerin sınav sürecini uçtan uca dijitalleştiren bir we
 
 ## Mimari
 
-```
-                         +---------------------------------+
-                         |           Supabase              |
-                         |   Auth  |  PostgreSQL  |  Storage  |
-                         +---------------------------------+
-                                   ^            ^
-                                   |            |
-     +--------------------+   REST |            |   +------------------------------+
-     |                    |   API  |            |   |                              |
-     |   React 19 + Vite  |--------+            +---|   FastAPI Backend             |
-     |   Tailwind CSS 4   |                         |                              |
-     |                    |                         |   OMR Engine    (OpenCV)      |
-     |   > Ayarlar        |                         |   OCR Engine    (Tesseract)   |
-     |   > Sınıf Listesi  |                         |   Form Üretici  (ReportLab)  |
-     |   > Tarama         |                         |   QR Okuyucu    (pyzbar)     |
-     |   > Doğrulama      |                         |   Auth          (JWT/JWKS)   |
-     |   > Sonuçlar       |                         |                              |
-     |   > Formlar        |                         +------------------------------+
-     |                    |                                       |
-     +--------------------+                                 Docker / Render
-           Vercel
-```
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="280">
+
+<br>
+
+<a href="https://vercel.com"><img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel"></a>
+
+**Frontend**
+
+<a href="https://react.dev"><img src="https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React"></a>
+<a href="https://vite.dev"><img src="https://img.shields.io/badge/Vite_8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite"></a>
+<a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind"></a>
+
+<sub>Ayarlar · Sınıf Listesi · Tarama<br>Doğrulama · Sonuçlar · Formlar</sub>
+
+<br><br>
+
+</td>
+<td align="center" width="60">
+
+**→**<br><sub>REST API</sub><br>**←**
+
+</td>
+<td align="center" width="280">
+
+<br>
+
+<a href="https://render.com"><img src="https://img.shields.io/badge/Render-000000?style=for-the-badge&logo=render&logoColor=white" alt="Render"></a>
+
+**Backend**
+
+<a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"></a>
+<a href="https://www.python.org"><img src="https://img.shields.io/badge/Python_3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+<a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"></a>
+
+<a href="https://opencv.org"><img src="https://img.shields.io/badge/OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white" alt="OpenCV"></a>
+<a href="https://github.com/tesseract-ocr/tesseract"><img src="https://img.shields.io/badge/Tesseract-4285F4?style=flat-square&logo=google&logoColor=white" alt="Tesseract"></a>
+<a href="https://www.reportlab.com"><img src="https://img.shields.io/badge/ReportLab-FF6F00?style=flat-square" alt="ReportLab"></a>
+
+<sub>OMR Engine · OCR Engine<br>Form Üretici · QR Okuyucu</sub>
+
+<br><br>
+
+</td>
+</tr>
+</table>
+
+<sub>▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼</sub>
+
+<table>
+<tr>
+<td align="center" width="620">
+
+<br>
+
+<a href="https://supabase.com"><img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"></a>
+
+<br><br>
+
+<table>
+<tr>
+<td align="center" width="180">
+
+<img src="https://img.shields.io/badge/Auth-3FCF8E?style=flat-square&logo=jsonwebtokens&logoColor=white" alt="Auth">
+
+<sub>E-posta / Şifre<br>JWT (RS256/HS256)<br>JWKS doğrulama</sub>
+
+</td>
+<td align="center" width="180">
+
+<img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL">
+
+<sub>sessions tablosu<br>JSONB veri saklama<br>user_id izolasyonu</sub>
+
+</td>
+<td align="center" width="180">
+
+<img src="https://img.shields.io/badge/Storage-FF6F00?style=flat-square&logo=files&logoColor=white" alt="Storage">
+
+<sub>form-images bucket<br>Taranan form JPEG'leri<br>Public URL erişimi</sub>
+
+</td>
+</tr>
+</table>
+
+<br>
+
+</td>
+</tr>
+</table>
+
+</div>
 
 <br>
 
