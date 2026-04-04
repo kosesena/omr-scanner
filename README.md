@@ -352,7 +352,7 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 <br><br>
 
-<img src="docs/ekran_formlar.png" alt="Formlar Sekmesi — Taranan Optik Formlar" width="700">
+<img src="docs/ekran_formlar.jpg" alt="Formlar Sekmesi — Taranan Optik Formlar" width="700">
 
 <br>
 
