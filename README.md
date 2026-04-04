@@ -231,11 +231,11 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 ### 4 &mdash; Tarama
 
-**Tara** sekmesinde telefon kamerasını aç veya fotoğraf yükle. Doldurulan formu çerçeve içine hizala (4 köşe işareti görünmeli) ve yakalama butonuna bas. Sonuç anında görünür: puan, cevaplar ve öğrenci bilgileri.
+**Tara** sekmesinde telefon kamerasını aç veya fotoğraf yükle. Doldurulan formu çerçeve içine hizala (4 köşe işareti görünmeli) ve yakalama butonuna bas. Sonuç anında görünür: öğrenci numarası ve notu.
 
 ### 5 &mdash; Doğrulama
 
-**Doğrula** sekmesinde tüm taramalar listelenir. Taranan form görüntüsü eşliğinde ad, soyad, numara ve kitapçık düzenlenebilir. Onaylanan taramalar sınıf listesiyle eşleştirilir.
+**Doğrula** sekmesinde tüm taramalar listelenir. Taranan form görüntüsü eşliğinde ad, soyad, numara ve kitapçık manuel olarak düzeltilip kaydedilir. Sonuçlar genellikle bu adımda doğrulanarak kesinleştirilir.
 
 ### 6 &mdash; Sonuçlar ve Analiz
 
