@@ -735,11 +735,22 @@ function RosterPage({ session, setSession, setPage }) {
     const _tryPdfUpload = async (sid) => {
       const formData = new FormData();
       formData.append("file", file);
-      return axios.post(
-        `${API}/api/sessions/${sid}/roster/pdf`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      // Retry up to 3 times for cold-start network errors
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          return await axios.post(
+            `${API}/api/sessions/${sid}/roster/pdf`,
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 }
+          );
+        } catch (err) {
+          lastErr = err;
+          if (err.response) throw err; // real HTTP error, don't retry
+          if (attempt < 2) await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+      throw lastErr;
     };
 
     try {
@@ -948,8 +959,8 @@ function RosterPage({ session, setSession, setPage }) {
 
         {/* Student list */}
         {students.length > 0 && (
-          <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-x-auto">
+            <table className="w-full text-sm min-w-[400px]">
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">#</th>
@@ -1521,14 +1532,26 @@ function ReviewPage({ session, results, setResults }) {
     setLoading(true);
     try {
       const resultIdx = reviews[currentIdx]._index;
-      const verifyRes = await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
-        result_index: resultIdx,
-        student_name: current.student_name?.text || "",
-        student_surname: current.student_surname?.text || "",
-        student_number: editNo,
-        booklet: editBooklet,
-        approved: true,
-      });
+      // Retry up to 3 times for cold-start network errors
+      let verifyRes, lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          verifyRes = await axios.post(`${API}/api/sessions/${session.session_id}/verify`, {
+            result_index: resultIdx,
+            student_name: current.student_name?.text || "",
+            student_surname: current.student_surname?.text || "",
+            student_number: editNo,
+            booklet: editBooklet,
+            approved: true,
+          }, { timeout: 30000 });
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (err.response) break;
+          if (attempt < 2) await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+      if (!verifyRes) throw lastErr;
       const newScore = verifyRes.data.score;
       const newCorrect = verifyRes.data.correct_count;
       // Update results state with corrected data
