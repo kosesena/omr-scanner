@@ -34,9 +34,9 @@ MARGIN_PT = 14 * MM
 MARKER_MARGIN_PT = 6 * MM
 MARKER_SIZE_PT = 9 * MM
 
-WARP_W = 1000
-WARP_H = 1414
-WARP_MARGIN = 30
+WARP_W = 1500
+WARP_H = 2121
+WARP_MARGIN = 45
 
 _marker_half = MARKER_SIZE_PT / 2
 MARKERS_RL = {
@@ -236,9 +236,9 @@ class OCREngine:
         if inner is None:
             return None
 
-        # Step 1: Upscale to ~120px tall
-        target_h = 120
-        scale = max(target_h / max(inner.shape[0], 1), 3)
+        # Step 1: Upscale to ~180px tall (increased from 120 for better OCR)
+        target_h = 180
+        scale = max(target_h / max(inner.shape[0], 1), 4)
         big = cv2.resize(inner, None, fx=scale, fy=scale,
                           interpolation=cv2.INTER_CUBIC)
 
@@ -307,7 +307,7 @@ class OCREngine:
         digit_b, conf_b = "?", 0.0
         inner = self._get_inner(cell, margin_frac=0.20)
         if inner is not None and inner.size > 0:
-            scale = max(180 / max(inner.shape[0], 1), 4)
+            scale = max(250 / max(inner.shape[0], 1), 5)
             big = cv2.resize(inner, None, fx=scale, fy=scale,
                               interpolation=cv2.INTER_CUBIC)
             blurred = cv2.GaussianBlur(big, (5, 5), 0)
@@ -335,8 +335,8 @@ class OCREngine:
 
         return ("?", 0.0)
 
-    def _preprocess_letter(self, cell: np.ndarray) -> Optional[np.ndarray]:
-        """Preprocess a letter box for Tesseract (similar to digit but tuned for letters)."""
+    def _preprocess_letter_adaptive(self, cell: np.ndarray) -> Optional[np.ndarray]:
+        """Strategy A: Adaptive threshold preprocessing for letters."""
         if cell is None or cell.size == 0:
             return None
 
@@ -344,9 +344,9 @@ class OCREngine:
         if inner is None:
             return None
 
-        # Upscale to ~120px tall
-        target_h = 120
-        scale = max(target_h / max(inner.shape[0], 1), 3)
+        # Upscale to ~200px tall (was 120 — higher res helps Tesseract)
+        target_h = 200
+        scale = max(target_h / max(inner.shape[0], 1), 4)
         big = cv2.resize(inner, None, fx=scale, fy=scale,
                           interpolation=cv2.INTER_CUBIC)
 
@@ -371,35 +371,49 @@ class OCREngine:
         binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
         # White border
-        border = 20
+        border = 25
         padded = cv2.copyMakeBorder(binary, border, border, border, border,
                                      cv2.BORDER_CONSTANT, value=255)
         return padded
 
-    def _read_letter(self, cell: np.ndarray) -> tuple:
-        """Read a single letter from a box. Returns (letter_str, confidence)."""
-        if not HAS_TESSERACT:
-            return ("?", 0.0)
+    def _preprocess_letter_otsu(self, cell: np.ndarray) -> Optional[np.ndarray]:
+        """Strategy B: Otsu threshold + higher upscale for letters."""
+        if cell is None or cell.size == 0:
+            return None
 
-        processed = self._preprocess_letter(cell)
-        if processed is None:
-            return ("?", 0.0)
+        inner = self._get_inner(cell, margin_frac=0.20)
+        if inner is None or inner.size == 0:
+            return None
 
-        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVYZabcdefghijklmnoprstuvyz"
+        # Higher upscale for Otsu strategy
+        scale = max(250 / max(inner.shape[0], 1), 5)
+        big = cv2.resize(inner, None, fx=scale, fy=scale,
+                          interpolation=cv2.INTER_CUBIC)
+
+        blurred = cv2.GaussianBlur(big, (5, 5), 0)
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Morphological close to fill gaps in strokes
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+        border = 30
+        padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                     cv2.BORDER_CONSTANT, value=255)
+        return padded
+
+    def _ocr_single_letter(self, processed: np.ndarray, config: str, lang: str = "tur") -> tuple:
+        """Run Tesseract on a preprocessed letter image. Returns (letter, confidence)."""
         try:
-            text = pytesseract.image_to_string(
-                processed, lang="tur", config=config
-            ).strip()
+            text = pytesseract.image_to_string(processed, lang=lang, config=config).strip()
 
             if not text:
                 # Fallback: try with eng
-                text = pytesseract.image_to_string(
-                    processed, lang="eng", config=config
-                ).strip()
+                text = pytesseract.image_to_string(processed, lang="eng", config=config).strip()
 
             if text and text[0].isalpha():
                 data = pytesseract.image_to_data(
-                    processed, lang="tur", config=config,
+                    processed, lang=lang, config=config,
                     output_type=pytesseract.Output.DICT
                 )
                 conf = 0.0
@@ -409,21 +423,173 @@ class OCREngine:
                         if c > conf:
                             conf = c
                 return (text[0].upper(), conf / 100.0)
-
-            return ("?", 0.0)
         except Exception as e:
             logger.warning(f"Tesseract letter error: {e}")
+        return ("?", 0.0)
+
+    def _read_letter(self, cell: np.ndarray) -> tuple:
+        """Read a single letter using dual-strategy consensus (like _read_digit).
+        If both strategies agree -> high confidence. If they disagree -> lower confidence."""
+        if not HAS_TESSERACT:
             return ("?", 0.0)
+
+        config = "--psm 10 --oem 3 -c tessedit_char_whitelist=ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZabcçdefgğhıijklmnoöprsştuüvyz"
+
+        # Strategy A: Adaptive threshold
+        letter_a, conf_a = "?", 0.0
+        processed_a = self._preprocess_letter_adaptive(cell)
+        if processed_a is not None:
+            letter_a, conf_a = self._ocr_single_letter(processed_a, config, "tur")
+
+        # Strategy B: Otsu threshold + higher upscale
+        letter_b, conf_b = "?", 0.0
+        processed_b = self._preprocess_letter_otsu(cell)
+        if processed_b is not None:
+            letter_b, conf_b = self._ocr_single_letter(processed_b, config, "tur")
+
+        # Consensus logic
+        if letter_a != "?" and letter_b != "?" and letter_a == letter_b:
+            # Both strategies agree — high confidence
+            return (letter_a, max(conf_a, conf_b))
+
+        if letter_a != "?" and letter_b != "?" and letter_a != letter_b:
+            # Strategies disagree — pick higher confidence but reduce it
+            logger.info(f"Letter disagreement: A='{letter_a}'({conf_a:.0%}) vs B='{letter_b}'({conf_b:.0%})")
+            if conf_a >= conf_b:
+                return (letter_a, conf_a * 0.7)
+            else:
+                return (letter_b, conf_b * 0.7)
+
+        # One succeeded, the other didn't
+        if letter_a != "?":
+            return (letter_a, conf_a)
+        if letter_b != "?":
+            return (letter_b, conf_b)
+
+        return ("?", 0.0)
+
+    def _read_name_strip(self, warped_gray: np.ndarray,
+                          field_name: str,
+                          filled_info: list) -> tuple:
+        """Read name/surname by joining filled boxes into a strip and using word-mode Tesseract.
+        This is more accurate than per-character reading for handwritten text.
+        Returns (text, confidence)."""
+        boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+
+        # Find first and last filled box
+        first_filled = -1
+        last_filled = -1
+        for idx, is_filled, _ in filled_info:
+            if is_filled:
+                if first_filled < 0:
+                    first_filled = idx
+                last_filled = idx
+
+        if first_filled < 0:
+            return ("", 0.0)
+
+        # Build word groups (split by empty boxes)
+        word_groups = []
+        current_word_boxes = []
+        for idx, is_filled, _ in filled_info:
+            if idx < first_filled or idx > last_filled:
+                continue
+            if is_filled:
+                current_word_boxes.append(boxes[idx])
+            else:
+                if current_word_boxes:
+                    word_groups.append(current_word_boxes)
+                    current_word_boxes = []
+        if current_word_boxes:
+            word_groups.append(current_word_boxes)
+
+        if not word_groups:
+            return ("", 0.0)
+
+        config = "--psm 7 --oem 3 -c tessedit_char_whitelist=ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZabcçdefgğhıijklmnoöprsştuüvyz "
+
+        words = []
+        total_conf = 0.0
+        word_count = 0
+
+        for group_boxes in word_groups:
+            # Merge boxes into a single strip image
+            x1 = min(b[0] for b in group_boxes)
+            y1 = min(b[1] for b in group_boxes)
+            x2 = max(b[2] for b in group_boxes)
+            y2 = max(b[3] for b in group_boxes)
+
+            h, w = warped_gray.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+
+            strip = warped_gray[y1:y2, x1:x2]
+            if strip.size == 0:
+                continue
+
+            # Upscale the strip
+            target_h = 80
+            scale = max(target_h / max(strip.shape[0], 1), 3)
+            big = cv2.resize(strip, None, fx=scale, fy=scale,
+                              interpolation=cv2.INTER_CUBIC)
+
+            # Normalize contrast
+            min_v, max_v = float(np.min(big)), float(np.max(big))
+            if max_v - min_v > 20:
+                normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+            else:
+                normalized = big
+
+            blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+            binary = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 21, 8
+            )
+
+            # Add border
+            border = 20
+            padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                         cv2.BORDER_CONSTANT, value=255)
+
+            try:
+                text = pytesseract.image_to_string(padded, lang="tur", config=config).strip()
+                if text:
+                    # Clean up: keep only letters and spaces
+                    cleaned = "".join(c for c in text if c.isalpha() or c == " ").strip().upper()
+                    if cleaned:
+                        words.append(cleaned)
+                        # Get confidence
+                        data = pytesseract.image_to_data(
+                            padded, lang="tur", config=config,
+                            output_type=pytesseract.Output.DICT
+                        )
+                        confs = [int(c) for c, t in zip(data["conf"], data["text"])
+                                 if t.strip() and int(c) > 0]
+                        if confs:
+                            total_conf += sum(confs) / len(confs)
+                            word_count += 1
+            except Exception as e:
+                logger.warning(f"Strip OCR error: {e}")
+
+        result_text = " ".join(words)
+        avg_conf = (total_conf / max(word_count, 1)) / 100.0
+
+        logger.info(f"OCR strip {field_name}: '{result_text}' (conf={avg_conf:.2f})")
+        return (result_text, avg_conf)
 
     def _read_name_with_tesseract(self, warped_gray: np.ndarray,
                                     field_name: str,
                                     filled_info: list) -> tuple:
-        """Read name/surname field character by character with Tesseract.
-        Returns (text, avg_confidence)."""
+        """Read name/surname using both strip and per-character approaches.
+        Returns the better result."""
         boxes = CHAR_BOX_POSITIONS.get(field_name, [])
+
+        # Approach 1: Strip reading (word mode — better for connected handwriting)
+        strip_text, strip_conf = self._read_name_strip(warped_gray, field_name, filled_info)
+
+        # Approach 2: Per-character reading (single char mode — better for printed letters)
         characters = []
         confidences = []
-
         for idx, is_filled, ink_score in filled_info:
             if not is_filled:
                 remaining_filled = any(f for _, f, _ in filled_info[idx + 1:])
@@ -439,11 +605,22 @@ class OCREngine:
             characters.append(letter)
             confidences.append(conf)
 
-        text = "".join(characters).strip()
-        avg_conf = sum(confidences) / max(len(confidences), 1)
+        char_text = "".join(characters).strip()
+        char_conf = sum(confidences) / max(len(confidences), 1)
 
-        logger.info(f"OCR Tesseract {field_name}: '{text}' (conf={avg_conf:.2f})")
-        return (text, avg_conf)
+        logger.info(f"OCR Tesseract {field_name}: strip='{strip_text}'({strip_conf:.2f}) "
+                     f"char='{char_text}'({char_conf:.2f})")
+
+        # Pick the better result
+        # Prefer strip if it has decent confidence (word context helps)
+        if strip_text and strip_conf > char_conf and strip_conf >= 0.3:
+            return (strip_text, strip_conf)
+        elif char_text and "?" not in char_text:
+            return (char_text, char_conf)
+        elif strip_text:
+            return (strip_text, strip_conf)
+        else:
+            return (char_text, char_conf)
 
     # ---- Name/Surname recognition via roster matching ----
 
@@ -574,24 +751,112 @@ class OCREngine:
                 pattern_str, char_count, word_lengths, box_pattern
             )
 
+    def _read_student_no_strip(self, warped_gray: np.ndarray, boxes: list) -> tuple:
+        """Read all 9 digit boxes as a single strip using Tesseract word mode.
+        Returns (text, confidence). More reliable than per-digit for connected writing."""
+        if not HAS_TESSERACT or not boxes:
+            return ("", 0.0)
+
+        # Merge all 9 boxes into one strip
+        x1 = min(b[0] for b in boxes)
+        y1 = min(b[1] for b in boxes)
+        x2 = max(b[2] for b in boxes)
+        y2 = max(b[3] for b in boxes)
+
+        h, w = warped_gray.shape[:2]
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
+
+        strip = warped_gray[y1:y2, x1:x2]
+        if strip.size == 0:
+            return ("", 0.0)
+
+        # Upscale
+        target_h = 100
+        scale = max(target_h / max(strip.shape[0], 1), 3)
+        big = cv2.resize(strip, None, fx=scale, fy=scale,
+                          interpolation=cv2.INTER_CUBIC)
+
+        # Normalize
+        min_v, max_v = float(np.min(big)), float(np.max(big))
+        if max_v - min_v > 20:
+            normalized = ((big.astype(float) - min_v) / (max_v - min_v) * 255).astype(np.uint8)
+        else:
+            normalized = big
+
+        blurred = cv2.GaussianBlur(normalized, (3, 3), 0)
+        binary = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 21, 8
+        )
+
+        border = 20
+        padded = cv2.copyMakeBorder(binary, border, border, border, border,
+                                     cv2.BORDER_CONSTANT, value=255)
+
+        config = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789"
+        try:
+            text = pytesseract.image_to_string(padded, lang="eng", config=config).strip()
+            # Keep only digits
+            digits = "".join(c for c in text if c.isdigit())
+
+            if digits:
+                data = pytesseract.image_to_data(
+                    padded, lang="eng", config=config,
+                    output_type=pytesseract.Output.DICT
+                )
+                confs = [int(c) for c, t in zip(data["conf"], data["text"])
+                         if t.strip() and int(c) > 0]
+                avg_conf = (sum(confs) / len(confs) / 100.0) if confs else 0.3
+                logger.info(f"OCR student_no strip: '{digits}' (conf={avg_conf:.2f})")
+                return (digits, avg_conf)
+        except Exception as e:
+            logger.warning(f"Strip digit OCR error: {e}")
+
+        return ("", 0.0)
+
     def _read_student_no(self, warped_gray: np.ndarray, boxes: list,
                           filled_info: list, box_pattern: list) -> FieldResult:
-        """Read student number using per-digit Tesseract.
+        """Read student number using per-digit Tesseract + strip reading.
         All 9 boxes are always read (student numbers are always 9 digits)."""
+
+        # Approach 1: Per-digit reading (existing dual-strategy consensus)
         characters = []
         confidences = []
-
-        # Force-read ALL boxes for student_no (students always fill all 9 digits)
         for idx in range(len(boxes)):
             cell = self._extract_box(warped_gray, boxes[idx])
             digit, conf = self._read_digit(cell)
             characters.append(digit)
             confidences.append(conf)
 
-        text = "".join(characters)
-        avg_conf = sum(confidences) / max(len(confidences), 1)
+        per_digit_text = "".join(characters)
+        per_digit_conf = sum(confidences) / max(len(confidences), 1)
 
-        # Try roster matching for student_no
+        # Approach 2: Strip reading (all 9 digits as one image)
+        strip_text, strip_conf = self._read_student_no_strip(warped_gray, boxes)
+
+        # Merge: use strip to fill in '?' gaps from per-digit
+        text = per_digit_text
+        avg_conf = per_digit_conf
+
+        if strip_text and len(strip_text) == 9:
+            if "?" in per_digit_text:
+                # Fill '?' positions with strip digits
+                merged = list(per_digit_text)
+                for i in range(min(len(merged), len(strip_text))):
+                    if merged[i] == "?":
+                        merged[i] = strip_text[i]
+                        confidences[i] = strip_conf
+                text = "".join(merged)
+                avg_conf = sum(confidences) / max(len(confidences), 1)
+                logger.info(f"OCR student_no: merged per-digit '{per_digit_text}' + strip '{strip_text}' -> '{text}'")
+            elif per_digit_conf < strip_conf:
+                # Strip is more confident overall
+                text = strip_text
+                avg_conf = strip_conf
+                confidences = [strip_conf] * 9
+
+        # Try roster matching for remaining '?'
         if "?" in text and self._roster_students:
             matched = self._match_student_no_roster(text)
             if matched:

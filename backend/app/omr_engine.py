@@ -37,9 +37,9 @@ MARKER_MARGIN_PT = 6 * MM
 MARKER_SIZE_PT = 9 * MM
 
 # Warped image dimensions (must match perspective_transform)
-WARP_W = 1000
-WARP_H = 1414
-WARP_MARGIN = 30
+WARP_W = 1500
+WARP_H = 2121
+WARP_MARGIN = 45
 
 # ArUco marker centers in ReportLab coords (bottom-left origin)
 _marker_half = MARKER_SIZE_PT / 2
