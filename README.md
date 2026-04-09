@@ -433,6 +433,42 @@ Uygulamayı açtığında giriş ekranı karşılar. İlk kullanımda **Kayıt O
 
 <br>
 
+## Teknik Kararlar ve Gerekçeleri
+
+### Frontend: React 19 + Vite 8 + Tailwind CSS 4
+
+Frontend framework olarak React tercih edildi. Component tabanlı mimarisi sayesinde tarama, sonuçlar, istatistik gibi bağımsız ekranlar modüler şekilde yönetilebiliyor. Kamera entegrasyonu için `react-webcam`, HTTP istekleri için `axios` gibi olgun kütüphaneler React ekosisteminde hazır bulunuyor. Build aracı olarak Vite seçildi; HMR (Hot Module Replacement) ile geliştirme döngüsü hızlı, production build süresi kısa. Stillendirme tarafında Tailwind CSS kullanıldı — utility-first yaklaşımı sayesinde responsive tasarım hızla uygulandı, ayrı CSS dosyalarıyla uğraşmak yerine doğrudan JSX içinde stil tanımlandı.
+
+### Backend: Python + FastAPI
+
+Backend dili olarak Python seçilmesinin temel sebebi görüntü işleme ekosistemi. OpenCV, Tesseract OCR, NumPy, Pillow gibi bilgisayarlı görü ve makine öğrenmesi kütüphanelerinin tamamı Python'da en olgun halinde bulunuyor. Web framework olarak FastAPI tercih edildi; async yapısı sayesinde görüntü işleme gibi ağır I/O operasyonlarında performans sağlıyor, ayrıca otomatik Swagger/OpenAPI dokümantasyonu üretiyor — bu sayede her endpoint `/docs` adresinden interaktif olarak test edilebiliyor.
+
+### Veritabanı ve Auth: Supabase
+
+Supabase, PostgreSQL veritabanı, kimlik doğrulama (Auth) ve dosya depolama (Storage) hizmetlerini tek bir platformda sunuyor. Ayrı ayrı veritabanı sunucusu, auth servisi ve dosya depolama çözümü kurmak yerine tek bir yapılandırmayla üç ihtiyaç birden karşılandı. JWT tabanlı kimlik doğrulama hazır geliyor, JWKS endpoint'i ile RS256 token doğrulaması otomatik çalışıyor. Ücretsiz katmanı proje kapsamı için yeterli.
+
+### Görüntü İşleme: OpenCV + ArUco
+
+Optik form okuma için OpenCV tercih edildi — açık kaynak, geniş topluluk desteği ve kapsamlı görüntü işleme fonksiyonları sunuyor. Form hizalamasında ArUco marker sistemi kullanıldı; formun 4 köşesine yerleştirilen bu işaretleyiciler sayesinde kağıt eğik veya açılı çekilse bile perspektif düzeltmesi uygulanabiliyor. Farklı aydınlatma ve çekim koşullarına dayanıklılık için 8 ayrı ön-işleme stratejisi (CLAHE, Gaussian blur, farklı eşikleme parametreleri) geliştirildi — bir strateji başarısız olduğunda sıradaki deneniyor.
+
+### El Yazısı Tanıma: Tesseract OCR
+
+Öğrenci adı, soyadı ve numarası gibi el yazısı alanlarını okumak için Tesseract OCR kullanıldı. Açık kaynak olması ve Türkçe dil paketi desteği (`tesseract-ocr-tur`) tercih sebebi. OCR sonuçlarına güven skoru atanıyor; eşik altında kalan okumalar otomatik olarak "doğrulama bekliyor" olarak işaretleniyor ve öğretmenin manuel düzeltmesine sunuluyor. Bu yaklaşım, hatalı okumaların sisteme girmesini engelliyor.
+
+### PDF Oluşturma: ReportLab
+
+Yazdırılabilir optik formların PDF olarak üretilmesi için ReportLab kullanıldı. Piksel düzeyinde hassas yerleşim kontrolü sunması sayesinde balonlar, karakter kutuları, ArUco marker'lar ve QR kodlar milimetrik doğrulukla konumlandırılabiliyor. DejaVuSans fontu ile Türkçe karakter desteği (ş, ç, ğ, ı, ö, ü) sorunsuz sağlanıyor.
+
+### Dağıtım: Vercel + Render + Docker
+
+Frontend Vercel üzerinde barındırılıyor — Git push ile otomatik build ve deploy, CDN üzerinden hızlı dağıtım. Backend ise Render üzerinde Docker konteyneri olarak çalışıyor; OpenCV ve Tesseract gibi sistem düzeyinde bağımlılıklar gerektiren kütüphaneler Docker sayesinde her ortamda tutarlı şekilde çalışıyor. Bu üçlü yapı (Vercel + Render + Supabase) sayesinde proje herhangi bir sunucu yönetimi gerektirmeden production ortamında çalışıyor.
+
+### Güvenlik: JWT + Kullanıcı İzolasyonu
+
+Kimlik doğrulama JWT (JSON Web Token) tabanlı. Supabase Auth, kullanıcı girişinde RS256 algoritmasıyla imzalanmış token üretiyor. Backend, bu token'ı JWKS endpoint'inden alınan public key ile doğruluyor. Her veritabanı sorgusu `user_id` ile filtreleniyor — bir öğretmen yalnızca kendi oluşturduğu sınavları görebiliyor ve düzenleyebiliyor. Hassas bilgiler (API anahtarları, JWT secret) `.env` dosyasında tutularak repoya dahil edilmiyor.
+
+<br>
+
 ## Proje Yapısı
 
 ```
