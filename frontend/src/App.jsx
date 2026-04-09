@@ -343,7 +343,25 @@ function SetupPage({ session, setSession, setPage }) {
         payload.answers_b = keysB;
         payload.use_booklet = true;
       }
-      const res = await axios.post(`${API}/api/sessions/create`, payload);
+      // Retry up to 3 times for cold-start network errors
+      let res, lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          res = await axios.post(`${API}/api/sessions/create`, payload, { timeout: 60000 });
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (err.response) break; // real HTTP error, don't retry
+          if (attempt < 2) await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+      if (!res) {
+        const msg = lastErr?.response?.data?.detail || lastErr?.message || "Bağlantı hatası";
+        const hint = (!lastErr?.response) ? "\nSunucu uyanıyor olabilir, birkaç saniye bekleyip tekrar deneyin." : "";
+        alert("Hata: " + msg + hint);
+        setLoading(false);
+        return;
+      }
       setSession({
         ...res.data,
         answer_key: keysA,
@@ -1139,9 +1157,9 @@ function ScanPage({ session, setSession, setResults, results }) {
       if (s.session_id) formData.append("session_id", s.session_id);
       if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
-      // Retry scan up to 2 times for cold-start network errors
+      // Retry scan up to 3 times for cold-start network errors
       let lastErr;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = await axios.post(`${API}/api/scan/base64`, formData, { timeout: 120000 });
           setLastResult(res.data);
@@ -1151,7 +1169,7 @@ function ScanPage({ session, setSession, setResults, results }) {
         } catch (err) {
           lastErr = err;
           if (err.response) break; // real HTTP error, don't retry
-          if (attempt === 0) await new Promise(r => setTimeout(r, 3000));
+          if (attempt < 2) await new Promise(r => setTimeout(r, 4000));
         }
       }
       const msg = lastErr.response?.data?.detail || lastErr.message;
@@ -1177,9 +1195,9 @@ function ScanPage({ session, setSession, setResults, results }) {
       if (s.session_id) formData.append("session_id", s.session_id);
       if (s.answer_key) formData.append("answer_key", JSON.stringify(s.answer_key));
 
-      // Retry scan up to 2 times for cold-start network errors
+      // Retry scan up to 3 times for cold-start network errors
       let lastErr;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = await axios.post(`${API}/api/scan`, formData, { timeout: 120000 });
           setLastResult(res.data);
@@ -1190,7 +1208,7 @@ function ScanPage({ session, setSession, setResults, results }) {
         } catch (err) {
           lastErr = err;
           if (err.response) break; // real HTTP error, don't retry
-          if (attempt === 0) await new Promise(r => setTimeout(r, 3000));
+          if (attempt < 2) await new Promise(r => setTimeout(r, 4000));
         }
       }
       const msg = lastErr.response?.data?.detail || lastErr.message;
