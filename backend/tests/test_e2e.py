@@ -6,12 +6,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.omr_engine import OMREngine, FORM_CONFIG, ANSWER_LAYOUTS
 
 def create_test_image(num_questions=20, seed=42):
-    h, w = 2121, 1500
+    h, w = 1414, 1000
     img = np.ones((h, w, 3), dtype=np.uint8) * 240
 
     # ArUco markers
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-    ms, mg = 90, 45
+    ms, mg = 60, 30
     for mid, (mx, my) in {0:(mg,mg),1:(w-mg-ms,mg),2:(mg,h-mg-ms),3:(w-mg-ms,h-mg-ms)}.items():
         m = cv2.aruco.generateImageMarker(aruco_dict, mid, ms)
         img[my:my+ms, mx:mx+ms] = cv2.cvtColor(m, cv2.COLOR_GRAY2BGR)
@@ -20,7 +20,7 @@ def create_test_image(num_questions=20, seed=42):
     engine = OMREngine(num_questions=num_questions)
     markers = engine.detect_markers(img)
     src_pts = np.float32([markers[i]["center"] for i in [0,1,2,3]])
-    dst_pts = np.float32([[45,45],[1455,45],[45,2076],[1455,2076]])
+    dst_pts = np.float32([[30,30],[970,30],[30,1384],[970,1384]])
     M_inv = cv2.getPerspectiveTransform(dst_pts, src_pts)
 
     def warped_to_orig(wx, wy):
